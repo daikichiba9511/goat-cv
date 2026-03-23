@@ -1,0 +1,68 @@
+export type Project = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type LabelCategory =
+  | "object"
+  | "entity"
+  | "key"
+  | "value"
+  | "table"
+  | "cell";
+
+export type LabelDefinition = {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  category: LabelCategory;
+};
+
+export type ImageStatus =
+  | "pending"
+  | "annotated"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "escalated";
+
+export type ImageMeta = {
+  id: string;
+  project_id: string;
+  filename: string;
+  original_width: number;
+  original_height: number;
+  width: number;
+  height: number;
+  rotation: 0 | 90 | 180 | 270;
+  flip_h: boolean;
+  flip_v: boolean;
+  status: ImageStatus;
+  uploaded_at: string;
+};
+
+export type BBoxCoordinates = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type PolygonCoordinates = {
+  points: { x: number; y: number }[];
+};
+
+export type Annotation = {
+  id: string;
+  image_id: string;
+  type: "bbox" | "polygon";
+  coordinates: BBoxCoordinates | PolygonCoordinates;
+  label_id: string | null;
+  created_at: string;
+};
+
+export type ListResponse<T> = {
+  items: T[];
+};
