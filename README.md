@@ -42,4 +42,4 @@ The frontend dev server proxies API requests to the backend on `localhost:8080`.
 
 ## Roadmap
 
-Work is tracked as small branches and pull requests. See [docs/roadmap.md](docs/roadmap.md) for the planned PR sequence.
+Work is tracked as small branches and pull requests. See [docs/spec.md](docs/spec.md) for product scope and [docs/roadmap.md](docs/roadmap.md) for the planned PR sequence.
