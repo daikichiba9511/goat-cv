@@ -7,10 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/chibadaimare/goat/backend/internal/handler"
-	"github.com/chibadaimare/goat/backend/internal/repository/sqlite"
-	"github.com/chibadaimare/goat/backend/internal/sqlcgen"
-	"github.com/chibadaimare/goat/backend/internal/usecase"
+	"github.com/daikichiba9511/goat-cv/backend/internal/handler"
+	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
+	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
+	"github.com/daikichiba9511/goat-cv/backend/internal/usecase"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -61,11 +61,11 @@ func main() {
 	annotationUC := usecase.NewAnnotationUsecase(annotationRepo)
 
 	// Handlers
-	projectH := handler.NewProjectHandler(projectUC)
-	labelH := handler.NewLabelHandler(labelUC)
-	imageH := handler.NewImageHandler(imageUC)
-	annotationH := handler.NewAnnotationHandler(annotationUC)
-	exportH := handler.NewExportHandler(projectUC, imageUC, annotationUC, labelUC)
+	projectHandler := handler.NewProjectHandler(projectUC)
+	labelHandler := handler.NewLabelHandler(labelUC)
+	imageHandler := handler.NewImageHandler(imageUC)
+	annotationHandler := handler.NewAnnotationHandler(annotationUC)
+	exportHandler := handler.NewExportHandler(projectUC, imageUC, annotationUC, labelUC)
 
 	// Routes
 	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
@@ -74,25 +74,25 @@ func main() {
 	})
 
 	r.Route("/api/v1/projects", func(r chi.Router) {
-		r.Mount("/", projectH.Routes())
+		r.Mount("/", projectHandler.Routes())
 		r.Route("/{projectId}/labels", func(r chi.Router) {
-			labelH.Routes(r)
+			labelHandler.Routes(r)
 		})
 		r.Route("/{projectId}/images", func(r chi.Router) {
-			imageH.ProjectRoutes(r)
+			imageHandler.ProjectRoutes(r)
 		})
-		r.Get("/{projectId}/export", exportH.ProjectExport)
+		r.Get("/{projectId}/export", exportHandler.ProjectExport)
 	})
 
-	r.Mount("/api/v1/images", imageH.ImageRoutes())
+	r.Mount("/api/v1/images", imageHandler.ImageRoutes())
 
 	r.Route("/api/v1/images/{imageId}/annotations", func(r chi.Router) {
-		annotationH.ImageRoutes(r)
+		annotationHandler.ImageRoutes(r)
 	})
 
-	r.Mount("/api/v1/annotations", annotationH.AnnotationRoutes())
+	r.Mount("/api/v1/annotations", annotationHandler.AnnotationRoutes())
 
-	r.Get("/api/v1/images/{imageId}/export", exportH.ImageExport)
+	r.Get("/api/v1/images/{imageId}/export", exportHandler.ImageExport)
 
 	log.Printf("starting server on %s", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/chibadaimare/goat/backend/internal/domain"
-	"github.com/chibadaimare/goat/backend/internal/sqlcgen"
+	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
+	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
 )
 
 const timeFormat = "2006-01-02T15:04:05Z"
