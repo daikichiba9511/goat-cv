@@ -113,7 +113,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     });
   };
 
-  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseDown = (_e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -125,7 +125,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     select(null);
   };
 
-  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseMove = (_e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!drawing || activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;

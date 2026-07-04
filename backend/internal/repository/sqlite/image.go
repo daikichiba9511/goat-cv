@@ -3,8 +3,8 @@ package sqlite
 import (
 	"context"
 
-	"github.com/chibadaimare/goat/backend/internal/domain"
-	"github.com/chibadaimare/goat/backend/internal/sqlcgen"
+	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
+	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
 )
 
 type ImageRepository struct {

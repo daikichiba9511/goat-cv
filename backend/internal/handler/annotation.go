@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/chibadaimare/goat/backend/internal/domain"
-	"github.com/chibadaimare/goat/backend/internal/usecase"
+	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
+	"github.com/daikichiba9511/goat-cv/backend/internal/usecase"
 	"github.com/go-chi/chi/v5"
 )
 

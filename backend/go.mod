@@ -1,4 +1,4 @@
-module github.com/chibadaimare/goat/backend
+module github.com/daikichiba9511/goat-cv/backend
 
 go 1.25.5
 

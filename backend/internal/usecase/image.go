@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/chibadaimare/goat/backend/internal/domain"
-	"github.com/chibadaimare/goat/backend/internal/repository/sqlite"
+	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
+	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 

@@ -3,7 +3,7 @@ package domain_test
 import (
 	"testing"
 
-	"github.com/chibadaimare/goat/backend/internal/domain"
+	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
 )
 
 func TestEffectiveDimensions(t *testing.T) {
