@@ -1,10 +1,11 @@
 # GOAT Product Specification
 
-GOAT は **Go CV Annotation Tool** の略称であり、帳票・フォーム・請求書などのドキュメント画像を対象にした Computer Vision アノテーションツールである。
+GOAT は **Go CV Annotation Tool** の略称であり、画像データセット作成のための Computer Vision アノテーションツールである。
+帳票・フォーム・請求書などのドキュメント画像は初期の重点ユースケースだが、ツール自体はドキュメント画像に限定しない。
 
 ## Goals
 
-- ドキュメント画像に対して BBox、Polygon、Annotation 間の Edge を付与できる
+- 画像に対して BBox、Polygon、Annotation 間の Edge を付与できる
 - Object Detection、Reading Order、Table Analysis、Information Extraction、KV Extraction のデータセット作成を支援する
 - まず単一ユーザー・同期保存のローカルツールとして小さく成立させる
 - 将来的に QA、事前推論、非同期共同編集へ拡張できるデータモデルとUI構造を保つ
@@ -30,7 +31,7 @@ GOAT は **Go CV Annotation Tool** の略称であり、帳票・フォーム・
 | Concept | Description |
 |---------|-------------|
 | Project | 画像、ラベル、ガイドライン、エクスポートの単位 |
-| Image | アノテーション対象のドキュメント画像 |
+| Image | アノテーション対象の画像 |
 | LabelDefinition | プロジェクト単位のラベル定義。カテゴリで用途を分ける |
 | Annotation | 画像上の領域。BBox または Polygon で表す |
 | Edge | Annotation 間の有向関係。Reading Order、KV、Table Cell を表す |
