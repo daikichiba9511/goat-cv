@@ -52,7 +52,7 @@ Completion criteria:
 
 ### M1: Graph Annotation
 
-Goal: support document graph datasets by connecting annotations with directed edges.
+Goal: support graph-structured CV datasets by connecting annotations with directed edges.
 
 PRs:
 
