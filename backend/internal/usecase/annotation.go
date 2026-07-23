@@ -8,14 +8,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// AnnotationUsecase coordinates annotation operations.
 type AnnotationUsecase struct {
 	repo *sqlite.AnnotationRepository
 }
 
+// NewAnnotationUsecase creates an AnnotationUsecase.
 func NewAnnotationUsecase(repo *sqlite.AnnotationRepository) *AnnotationUsecase {
 	return &AnnotationUsecase{repo: repo}
 }
 
+// Create creates an annotation for an image.
 func (u *AnnotationUsecase) Create(ctx context.Context, imageID string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
 	ann := domain.Annotation{
 		ID:          uuid.Must(uuid.NewV7()).String(),
@@ -27,10 +30,12 @@ func (u *AnnotationUsecase) Create(ctx context.Context, imageID string, annType 
 	return u.repo.Create(ctx, ann)
 }
 
+// ListByImage returns annotations for an image.
 func (u *AnnotationUsecase) ListByImage(ctx context.Context, imageID string) ([]domain.Annotation, error) {
 	return u.repo.ListByImage(ctx, imageID)
 }
 
+// Update changes an annotation.
 func (u *AnnotationUsecase) Update(ctx context.Context, id string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
 	ann := domain.Annotation{
 		ID:          id,
@@ -41,13 +46,16 @@ func (u *AnnotationUsecase) Update(ctx context.Context, id string, annType domai
 	return u.repo.Update(ctx, ann)
 }
 
+// Delete removes an annotation by ID.
 func (u *AnnotationUsecase) Delete(ctx context.Context, id string) error {
 	return u.repo.Delete(ctx, id)
 }
 
-// BulkReplace replaces all annotations for an image.
-// Annotations without an ID get a new UUID assigned.
+// BulkReplace replaces all annotations for an image and returns the persisted rows.
+// Annotations with an empty ID are treated as new records and receive UUID v7 IDs.
 func (u *AnnotationUsecase) BulkReplace(ctx context.Context, imageID string, annotations []domain.Annotation) ([]domain.Annotation, error) {
+	// Why: フロントエンドは未保存Annotationを一時IDで扱うため、永続化境界でだけUUID v7へ置き換える。
+	// Why not: Phase 1では操作ログ同期をしないので、個別差分ではなく画像単位の現在状態を正とする。
 	for i := range annotations {
 		if annotations[i].ID == "" {
 			annotations[i].ID = uuid.Must(uuid.NewV7()).String()

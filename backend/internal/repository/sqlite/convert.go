@@ -11,6 +11,7 @@ import (
 const timeFormat = "2006-01-02T15:04:05Z"
 
 func parseTime(s string) time.Time {
+	// Why: 現在の時刻文字列はDBのDEFAULTまたはアプリ内Formatからだけ来る前提で、変換エラーを呼び出し側の分岐にしない。
 	t, _ := time.Parse(timeFormat, s)
 	return t
 }

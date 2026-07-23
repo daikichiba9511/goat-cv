@@ -40,6 +40,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
+		// Why: Phase 1はローカル開発前提なので、Vite dev serverだけを明示的に許可する。
 		AllowedOrigins:   []string{"http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type"},
@@ -124,23 +125,24 @@ func runMigrations(db *sql.DB) error {
 }
 
 func findMigrationDir() string {
+	// Why: `go run ./cmd/server` と repo root からの起動の両方を許容し、開発時の起動場所に依存させない。
 	candidates := []string{
 		"db/migrations",
 		"backend/db/migrations",
 		"../db/migrations",
 		"../../db/migrations",
 	}
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			return c
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
 		}
 	}
 	return "db/migrations"
 }
 
 func envOrDefault(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
 	return fallback
 }

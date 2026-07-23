@@ -31,20 +31,24 @@ func toAnnotationResponse(a domain.Annotation) annotationResponse {
 	}
 }
 
+// AnnotationHandler serves annotation API routes.
 type AnnotationHandler struct {
 	uc *usecase.AnnotationUsecase
 }
 
+// NewAnnotationHandler creates an AnnotationHandler.
 func NewAnnotationHandler(uc *usecase.AnnotationUsecase) *AnnotationHandler {
 	return &AnnotationHandler{uc: uc}
 }
 
+// ImageRoutes registers image-scoped annotation collection routes.
 func (h *AnnotationHandler) ImageRoutes(r chi.Router) {
 	r.Post("/", h.create)
 	r.Get("/", h.list)
 	r.Put("/", h.bulkReplace)
 }
 
+// AnnotationRoutes returns annotation item routes.
 func (h *AnnotationHandler) AnnotationRoutes() chi.Router {
 	r := chi.NewRouter()
 	r.Patch("/{annotationId}", h.update)
@@ -84,8 +88,8 @@ func (h *AnnotationHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]annotationResponse, len(annotations))
-	for i, a := range annotations {
-		items[i] = toAnnotationResponse(a)
+	for i, annotation := range annotations {
+		items[i] = toAnnotationResponse(annotation)
 	}
 	writeJSON(w, http.StatusOK, listResponse{Items: items})
 }
@@ -106,12 +110,12 @@ func (h *AnnotationHandler) bulkReplace(w http.ResponseWriter, r *http.Request) 
 	}
 
 	annotations := make([]domain.Annotation, len(req.Annotations))
-	for i, a := range req.Annotations {
+	for i, requestAnnotation := range req.Annotations {
 		annotations[i] = domain.Annotation{
-			ID:          a.ID,
-			Type:        domain.AnnotationType(a.Type),
-			Coordinates: domain.Coordinates(a.Coordinates),
-			LabelID:     a.LabelID,
+			ID:          requestAnnotation.ID,
+			Type:        domain.AnnotationType(requestAnnotation.Type),
+			Coordinates: domain.Coordinates(requestAnnotation.Coordinates),
+			LabelID:     requestAnnotation.LabelID,
 		}
 	}
 
@@ -121,8 +125,8 @@ func (h *AnnotationHandler) bulkReplace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	items := make([]annotationResponse, len(result))
-	for i, a := range result {
-		items[i] = toAnnotationResponse(a)
+	for i, annotation := range result {
+		items[i] = toAnnotationResponse(annotation)
 	}
 	writeJSON(w, http.StatusOK, listResponse{Items: items})
 }

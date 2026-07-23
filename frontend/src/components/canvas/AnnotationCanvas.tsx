@@ -27,50 +27,50 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     useAnnotationStore();
   const { labels } = useProjectStore();
 
-  // Load image
+  // Why: KonvaはHTMLImageElementを描画元にするため、API URLをReact state上の画像要素へ変換する。
   useEffect(() => {
-    const el = new window.Image();
-    el.src = imageFileUrl(image.id);
-    el.onload = () => setImg(el);
-    return () => { el.onload = null; };
+    const imageElement = new window.Image();
+    imageElement.src = imageFileUrl(image.id);
+    imageElement.onload = () => setImg(imageElement);
+    return () => { imageElement.onload = null; };
   }, [image.id]);
 
-  // Resize stage to fill container
+  // Why: Canvasサイズはレイアウトに従わせ、画像の保存座標を画面ピクセルへ依存させない。
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const obs = new ResizeObserver((entries) => {
+    const resizeObserver = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       setStageSize({ width, height });
     });
-    obs.observe(container);
-    return () => obs.disconnect();
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
   }, []);
 
-  // Compute scale to fit image in stage
+  // Why: 初期表示は全体が見えるfitにし、手動Zoom/PanはStage変換として別に持つ。
   const scale = img && stageSize.width > 0
     ? Math.min(stageSize.width / image.width, stageSize.height / image.height)
     : 1;
 
-  // Update transformer when selection changes
+  // Why: Transformerは選択ツール中だけ表示し、BBox作成やPan操作とハンドル操作が競合しないようにする。
   useEffect(() => {
-    const tr = transformerRef.current;
+    const transformer = transformerRef.current;
     const stage = stageRef.current;
-    if (!tr || !stage) return;
+    if (!transformer || !stage) return;
 
     if (selectedId && activeTool === "select") {
       const node = stage.findOne(`#${CSS.escape(selectedId)}`);
       if (node) {
-        tr.nodes([node]);
-        tr.getLayer()?.batchDraw();
+        transformer.nodes([node]);
+        transformer.getLayer()?.batchDraw();
         return;
       }
     }
-    tr.nodes([]);
-    tr.getLayer()?.batchDraw();
+    transformer.nodes([]);
+    transformer.getLayer()?.batchDraw();
   }, [selectedId, activeTool, annotations]);
 
-  // Convert screen pixel position to normalized image coordinates (0-1)
+  // Why: 保存座標は正規化値なので、Zoom/Pan後の画面座標を画像座標へ戻してから保存する。
   const screenToNormalized = useCallback(
     (screenX: number, screenY: number): [number, number] => {
       const imageX = (screenX - stagePos.x) / stageScale;
@@ -80,7 +80,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     [image.width, image.height, scale, stageScale, stagePos],
   );
 
-  // Convert local layer coordinates to normalized (used by drag/transform handlers)
+  // Why: Drag/Transform後のNode座標はLayer座標なので、StageのZoom/Pan補正を二重適用しない。
   const layerToNormalized = useCallback(
     (lx: number, ly: number): [number, number] => {
       return [lx / (image.width * scale), ly / (image.height * scale)];
@@ -101,6 +101,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
     const clampedScale = Math.max(0.1, Math.min(10, newScale));
 
+    // Why: ポインタ位置を基準にZoomし、注目しているAnnotationが画面外へ飛ばないようにする。
     const mousePointTo = {
       x: (pointer.x - stagePos.x) / oldScale,
       y: (pointer.y - stagePos.y) / oldScale,
@@ -113,7 +114,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     });
   };
 
-  const handleMouseDown = (_e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseDown = () => {
     if (activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -125,7 +126,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     select(null);
   };
 
-  const handleMouseMove = (_e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleMouseMove = () => {
     if (!drawing || activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -142,14 +143,14 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
 
   const handleMouseUp = () => {
     if (!drawing || activeTool !== "bbox") return;
-    // Normalize negative width/height
+    // Why: annotatorが右下以外へドラッグしても、保存時は正の幅高さを持つBBoxへ正規化する。
     const coords: BBoxCoordinates = {
       x: drawing.width < 0 ? drawing.x + drawing.width : drawing.x,
       y: drawing.height < 0 ? drawing.y + drawing.height : drawing.y,
       width: Math.abs(drawing.width),
       height: Math.abs(drawing.height),
     };
-    // Ignore tiny boxes
+    // Why not: クリックや手ぶれでできる微小BBoxはAnnotationとして保存しない。
     if (coords.width > 0.005 && coords.height > 0.005) {
       addBBox(image.id, coords, activeLabel);
     }
@@ -255,6 +256,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
                   const node = e.target;
                   const scaleX = node.scaleX();
                   const scaleY = node.scaleY();
+                  // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
                   node.scaleX(1);
                   node.scaleY(1);
                   const [nx, ny] = layerToNormalized(node.x(), node.y());

@@ -28,14 +28,17 @@ func toLabelResponse(l domain.LabelDefinition) labelResponse {
 	}
 }
 
+// LabelHandler serves label definition API routes.
 type LabelHandler struct {
 	uc *usecase.LabelUsecase
 }
 
+// NewLabelHandler creates a LabelHandler.
 func NewLabelHandler(uc *usecase.LabelUsecase) *LabelHandler {
 	return &LabelHandler{uc: uc}
 }
 
+// Routes registers label definition routes on a project-scoped router.
 func (h *LabelHandler) Routes(r chi.Router) {
 	r.Post("/", h.create)
 	r.Get("/", h.list)
@@ -75,8 +78,8 @@ func (h *LabelHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]labelResponse, len(labels))
-	for i, l := range labels {
-		items[i] = toLabelResponse(l)
+	for i, label := range labels {
+		items[i] = toLabelResponse(label)
 	}
 	writeJSON(w, http.StatusOK, listResponse{Items: items})
 }

@@ -15,32 +15,38 @@ import (
 	"github.com/google/uuid"
 )
 
+// ImageUsecase coordinates image file storage and image metadata operations.
 type ImageUsecase struct {
 	repo        *sqlite.ImageRepository
 	storagePath string
 }
 
+// NewImageUsecase creates an ImageUsecase.
 func NewImageUsecase(repo *sqlite.ImageRepository, storagePath string) *ImageUsecase {
 	return &ImageUsecase{repo: repo, storagePath: storagePath}
 }
 
+// Upload stores an image file and creates its metadata record.
+// The returned Image keeps the original filename for display, while the local file path is derived from the generated image ID.
 func (u *ImageUsecase) Upload(ctx context.Context, projectID, filename string, file io.Reader) (domain.Image, error) {
 	id := uuid.Must(uuid.NewV7()).String()
 
-	localPath := filepath.Join(u.storagePath, id+filepath.Ext(filename))
-	f, err := os.Create(localPath)
+	// Why: 保存名をUUIDにして、同名アップロードの衝突とユーザー入力由来パスを避ける。
+	storageFilePath := filepath.Join(u.storagePath, id+filepath.Ext(filename))
+	storedFile, err := os.Create(storageFilePath)
 	if err != nil {
 		return domain.Image{}, fmt.Errorf("create file: %w", err)
 	}
-	defer f.Close()
+	defer storedFile.Close()
 
-	if _, err := io.Copy(f, file); err != nil {
+	if _, err := io.Copy(storedFile, file); err != nil {
 		return domain.Image{}, fmt.Errorf("save file: %w", err)
 	}
 
-	w, h, err := getImageDimensions(localPath)
+	width, height, err := getImageDimensions(storageFilePath)
 	if err != nil {
-		os.Remove(localPath)
+		// Why not: 画像として読めないファイルはDBに残さない。ファイル保存だけ成功した状態を作らない。
+		os.Remove(storageFilePath)
 		return domain.Image{}, fmt.Errorf("read image dimensions: %w", err)
 	}
 
@@ -48,10 +54,10 @@ func (u *ImageUsecase) Upload(ctx context.Context, projectID, filename string, f
 		ID:             id,
 		ProjectID:      projectID,
 		Filename:       filename,
-		OriginalWidth:  w,
-		OriginalHeight: h,
-		Width:          w,
-		Height:         h,
+		OriginalWidth:  width,
+		OriginalHeight: height,
+		Width:          width,
+		Height:         height,
 		Rotation:       domain.Rotation0,
 		FlipH:          false,
 		FlipV:          false,
@@ -60,27 +66,37 @@ func (u *ImageUsecase) Upload(ctx context.Context, projectID, filename string, f
 	return u.repo.Create(ctx, img)
 }
 
+// Get returns image metadata by ID.
 func (u *ImageUsecase) Get(ctx context.Context, id string) (domain.Image, error) {
 	return u.repo.Get(ctx, id)
 }
 
+// ListByProject returns images for a project.
 func (u *ImageUsecase) ListByProject(ctx context.Context, projectID string) ([]domain.Image, error) {
 	return u.repo.ListByProject(ctx, projectID)
 }
 
+// FilePath returns the local storage path for an image.
+// The path is derived from the image ID and original extension; callers should not persist this value.
 func (u *ImageUsecase) FilePath(img domain.Image) string {
+	// Why: DBには元ファイル名を残し、ローカル保存場所はIDと拡張子から再構成する。
 	return filepath.Join(u.storagePath, img.ID+filepath.Ext(img.Filename))
 }
 
+// UpdateTransform updates image transform metadata and effective dimensions.
+// It does not rewrite the stored image file.
 func (u *ImageUsecase) UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool) (domain.Image, error) {
 	img, err := u.repo.Get(ctx, id)
 	if err != nil {
 		return domain.Image{}, err
 	}
-	w, h := domain.EffectiveDimensions(img.OriginalWidth, img.OriginalHeight, rotation)
-	return u.repo.UpdateTransform(ctx, id, rotation, flipH, flipV, w, h)
+	// Why: 回転・反転は画像ファイルを書き換えず、annotatorが見る座標空間のサイズだけを更新する。
+	width, height := domain.EffectiveDimensions(img.OriginalWidth, img.OriginalHeight, rotation)
+	return u.repo.UpdateTransform(ctx, id, rotation, flipH, flipV, width, height)
 }
 
+// Delete removes image metadata and its local file.
+// Missing local files are ignored so stale storage does not block metadata cleanup.
 func (u *ImageUsecase) Delete(ctx context.Context, id string) error {
 	img, err := u.repo.Get(ctx, id)
 	if err != nil {
@@ -91,15 +107,15 @@ func (u *ImageUsecase) Delete(ctx context.Context, id string) error {
 }
 
 func getImageDimensions(path string) (int, int, error) {
-	f, err := os.Open(path)
+	imageFile, err := os.Open(path)
 	if err != nil {
 		return 0, 0, err
 	}
-	defer f.Close()
+	defer imageFile.Close()
 
-	cfg, _, err := image.DecodeConfig(f)
+	config, _, err := image.DecodeConfig(imageFile)
 	if err != nil {
 		return 0, 0, err
 	}
-	return cfg.Width, cfg.Height, nil
+	return config.Width, config.Height, nil
 }

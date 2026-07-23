@@ -7,16 +7,19 @@ import (
 	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
 )
 
+// ImageRepository persists image metadata in SQLite.
 type ImageRepository struct {
-	q *sqlcgen.Queries
+	queries *sqlcgen.Queries
 }
 
-func NewImageRepository(q *sqlcgen.Queries) *ImageRepository {
-	return &ImageRepository{q: q}
+// NewImageRepository creates an ImageRepository.
+func NewImageRepository(queries *sqlcgen.Queries) *ImageRepository {
+	return &ImageRepository{queries: queries}
 }
 
+// Create inserts image metadata.
 func (r *ImageRepository) Create(ctx context.Context, img domain.Image) (domain.Image, error) {
-	row, err := r.q.CreateImage(ctx, sqlcgen.CreateImageParams{
+	row, err := r.queries.CreateImage(ctx, sqlcgen.CreateImageParams{
 		ID:             img.ID,
 		ProjectID:      img.ProjectID,
 		Filename:       img.Filename,
@@ -34,16 +37,18 @@ func (r *ImageRepository) Create(ctx context.Context, img domain.Image) (domain.
 	return toImage(row), nil
 }
 
+// Get returns image metadata by ID.
 func (r *ImageRepository) Get(ctx context.Context, id string) (domain.Image, error) {
-	row, err := r.q.GetImage(ctx, id)
+	row, err := r.queries.GetImage(ctx, id)
 	if err != nil {
 		return domain.Image{}, err
 	}
 	return toImage(row), nil
 }
 
+// ListByProject returns images for a project.
 func (r *ImageRepository) ListByProject(ctx context.Context, projectID string) ([]domain.Image, error) {
-	rows, err := r.q.ListImagesByProject(ctx, projectID)
+	rows, err := r.queries.ListImagesByProject(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +59,9 @@ func (r *ImageRepository) ListByProject(ctx context.Context, projectID string) (
 	return images, nil
 }
 
+// ListByProjectAndStatus returns images for a project filtered by status.
 func (r *ImageRepository) ListByProjectAndStatus(ctx context.Context, projectID string, status domain.ImageStatus) ([]domain.Image, error) {
-	rows, err := r.q.ListImagesByProjectAndStatus(ctx, sqlcgen.ListImagesByProjectAndStatusParams{
+	rows, err := r.queries.ListImagesByProjectAndStatus(ctx, sqlcgen.ListImagesByProjectAndStatusParams{
 		ProjectID: projectID,
 		Status:    string(status),
 	})
@@ -69,8 +75,9 @@ func (r *ImageRepository) ListByProjectAndStatus(ctx context.Context, projectID 
 	return images, nil
 }
 
+// UpdateTransform changes image transform metadata.
 func (r *ImageRepository) UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool, width, height int) (domain.Image, error) {
-	row, err := r.q.UpdateImageTransform(ctx, sqlcgen.UpdateImageTransformParams{
+	row, err := r.queries.UpdateImageTransform(ctx, sqlcgen.UpdateImageTransformParams{
 		Rotation: int64(rotation),
 		FlipH:    flipH,
 		FlipV:    flipV,
@@ -84,8 +91,9 @@ func (r *ImageRepository) UpdateTransform(ctx context.Context, id string, rotati
 	return toImage(row), nil
 }
 
+// UpdateStatus changes an image workflow status.
 func (r *ImageRepository) UpdateStatus(ctx context.Context, id string, status domain.ImageStatus) (domain.Image, error) {
-	row, err := r.q.UpdateImageStatus(ctx, sqlcgen.UpdateImageStatusParams{
+	row, err := r.queries.UpdateImageStatus(ctx, sqlcgen.UpdateImageStatusParams{
 		Status: string(status),
 		ID:     id,
 	})
@@ -95,6 +103,7 @@ func (r *ImageRepository) UpdateStatus(ctx context.Context, id string, status do
 	return toImage(row), nil
 }
 
+// Delete removes image metadata by ID.
 func (r *ImageRepository) Delete(ctx context.Context, id string) error {
-	return r.q.DeleteImage(ctx, id)
+	return r.queries.DeleteImage(ctx, id)
 }

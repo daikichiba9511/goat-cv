@@ -24,14 +24,17 @@ func toProjectResponse(p domain.Project) projectResponse {
 	}
 }
 
+// ProjectHandler serves project API routes.
 type ProjectHandler struct {
 	uc *usecase.ProjectUsecase
 }
 
+// NewProjectHandler creates a ProjectHandler.
 func NewProjectHandler(uc *usecase.ProjectUsecase) *ProjectHandler {
 	return &ProjectHandler{uc: uc}
 }
 
+// Routes returns the project API router.
 func (h *ProjectHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/", h.create)
@@ -70,8 +73,8 @@ func (h *ProjectHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]projectResponse, len(projects))
-	for i, p := range projects {
-		items[i] = toProjectResponse(p)
+	for i, project := range projects {
+		items[i] = toProjectResponse(project)
 	}
 	writeJSON(w, http.StatusOK, listResponse{Items: items})
 }

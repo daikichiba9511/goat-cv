@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// ExportHandler serves dataset export routes.
 type ExportHandler struct {
 	projectUC    *usecase.ProjectUsecase
 	imageUC      *usecase.ImageUsecase
@@ -17,6 +18,7 @@ type ExportHandler struct {
 	labelUC      *usecase.LabelUsecase
 }
 
+// NewExportHandler creates an ExportHandler.
 func NewExportHandler(
 	projectUC *usecase.ProjectUsecase,
 	imageUC *usecase.ImageUsecase,
@@ -31,6 +33,7 @@ func NewExportHandler(
 	}
 }
 
+// ProjectExport writes a GOAT JSON export for a project.
 func (h *ExportHandler) ProjectExport(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "projectId")
 	ctx := r.Context()
@@ -54,8 +57,8 @@ func (h *ExportHandler) ProjectExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	labelMap := make(map[string]string, len(labels))
-	for _, l := range labels {
-		labelMap[l.ID] = l.Name
+	for _, label := range labels {
+		labelMap[label.ID] = label.Name
 	}
 
 	exportImages := make([]exportImage, 0, len(images))
@@ -69,12 +72,12 @@ func (h *ExportHandler) ProjectExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exportLabels := make([]exportLabel, len(labels))
-	for i, l := range labels {
+	for i, label := range labels {
 		exportLabels[i] = exportLabel{
-			ID:       l.ID,
-			Name:     l.Name,
-			Color:    l.Color,
-			Category: string(l.Category),
+			ID:       label.ID,
+			Name:     label.Name,
+			Color:    label.Color,
+			Category: string(label.Category),
 		}
 	}
 
@@ -89,6 +92,7 @@ func (h *ExportHandler) ProjectExport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// ImageExport writes a GOAT JSON export for a single image.
 func (h *ExportHandler) ImageExport(w http.ResponseWriter, r *http.Request) {
 	imageID := chi.URLParam(r, "imageId")
 	ctx := r.Context()
@@ -106,8 +110,8 @@ func (h *ExportHandler) ImageExport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	labelMap := make(map[string]string, len(labels))
-	for _, l := range labels {
-		labelMap[l.ID] = l.Name
+	for _, label := range labels {
+		labelMap[label.ID] = label.Name
 	}
 
 	ei, err := h.buildExportImage(ctx, img, labelMap)
@@ -126,16 +130,17 @@ func (h *ExportHandler) buildExportImage(ctx context.Context, img domain.Image, 
 	}
 
 	exportAnns := make([]exportAnnotation, len(annotations))
-	for i, a := range annotations {
+	for i, annotation := range annotations {
 		var labelName string
-		if a.LabelID != nil {
-			labelName = labelMap[*a.LabelID]
+		if annotation.LabelID != nil {
+			// Why: label_idはON DELETE SET NULLなので、欠落したラベル名は空文字のまま出して古いAnnotationを壊さない。
+			labelName = labelMap[*annotation.LabelID]
 		}
 		exportAnns[i] = exportAnnotation{
-			ID:          a.ID,
-			Type:        string(a.Type),
-			Coordinates: json.RawMessage(a.Coordinates),
-			LabelID:     a.LabelID,
+			ID:          annotation.ID,
+			Type:        string(annotation.Type),
+			Coordinates: json.RawMessage(annotation.Coordinates),
+			LabelID:     annotation.LabelID,
 			Label:       labelName,
 		}
 	}
@@ -151,7 +156,8 @@ func (h *ExportHandler) buildExportImage(ctx context.Context, img domain.Image, 
 		FlipH:          img.FlipH,
 		FlipV:          img.FlipV,
 		Annotations:    exportAnns,
-		Edges:          []exportEdge{},
+		// Why not: Edgeの完全ExportはPhase 2以降で扱う。Phase 1のJSON形状だけ先に固定する。
+		Edges: []exportEdge{},
 	}, nil
 }
 
