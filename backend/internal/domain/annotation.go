@@ -2,13 +2,17 @@ package domain
 
 import "time"
 
+// AnnotationType identifies the coordinate schema used by an annotation.
 type AnnotationType string
 
 const (
-	AnnotationTypeBBox    AnnotationType = "bbox"
+	// AnnotationTypeBBox represents a rectangular bounding box annotation.
+	AnnotationTypeBBox AnnotationType = "bbox"
+	// AnnotationTypePolygon represents a polygon annotation.
 	AnnotationTypePolygon AnnotationType = "polygon"
 )
 
+// BBoxCoordinates stores normalized rectangle coordinates.
 type BBoxCoordinates struct {
 	X      float64 `json:"x"`
 	Y      float64 `json:"y"`
@@ -16,19 +20,22 @@ type BBoxCoordinates struct {
 	Height float64 `json:"height"`
 }
 
+// Point stores a normalized 2D point.
 type Point struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }
 
+// PolygonCoordinates stores normalized polygon vertices.
 type PolygonCoordinates struct {
 	Points []Point `json:"points"`
 }
 
-// Coordinates holds the raw JSON of annotation coordinates.
-// Deserialized to BBoxCoordinates or PolygonCoordinates based on AnnotationType.
+// Coordinates stores raw annotation coordinate JSON.
+// The payload is decoded as BBoxCoordinates or PolygonCoordinates according to Annotation.Type.
 type Coordinates []byte
 
+// Annotation represents a labeled region on an image.
 type Annotation struct {
 	ID          string
 	ImageID     string

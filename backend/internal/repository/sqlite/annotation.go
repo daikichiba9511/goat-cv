@@ -8,17 +8,20 @@ import (
 	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
 )
 
+// AnnotationRepository persists annotations in SQLite.
 type AnnotationRepository struct {
-	db *sql.DB
-	q  *sqlcgen.Queries
+	db      *sql.DB
+	queries *sqlcgen.Queries
 }
 
-func NewAnnotationRepository(db *sql.DB, q *sqlcgen.Queries) *AnnotationRepository {
-	return &AnnotationRepository{db: db, q: q}
+// NewAnnotationRepository creates an AnnotationRepository.
+func NewAnnotationRepository(db *sql.DB, queries *sqlcgen.Queries) *AnnotationRepository {
+	return &AnnotationRepository{db: db, queries: queries}
 }
 
+// Create inserts an annotation.
 func (r *AnnotationRepository) Create(ctx context.Context, ann domain.Annotation) (domain.Annotation, error) {
-	row, err := r.q.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
+	row, err := r.queries.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
 		ID:          ann.ID,
 		ImageID:     ann.ImageID,
 		Type:        string(ann.Type),
@@ -31,16 +34,18 @@ func (r *AnnotationRepository) Create(ctx context.Context, ann domain.Annotation
 	return toAnnotation(row), nil
 }
 
+// Get returns an annotation by ID.
 func (r *AnnotationRepository) Get(ctx context.Context, id string) (domain.Annotation, error) {
-	row, err := r.q.GetAnnotation(ctx, id)
+	row, err := r.queries.GetAnnotation(ctx, id)
 	if err != nil {
 		return domain.Annotation{}, err
 	}
 	return toAnnotation(row), nil
 }
 
+// ListByImage returns annotations for an image.
 func (r *AnnotationRepository) ListByImage(ctx context.Context, imageID string) ([]domain.Annotation, error) {
-	rows, err := r.q.ListAnnotationsByImage(ctx, imageID)
+	rows, err := r.queries.ListAnnotationsByImage(ctx, imageID)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +56,9 @@ func (r *AnnotationRepository) ListByImage(ctx context.Context, imageID string) 
 	return annotations, nil
 }
 
+// Update changes an annotation.
 func (r *AnnotationRepository) Update(ctx context.Context, ann domain.Annotation) (domain.Annotation, error) {
-	row, err := r.q.UpdateAnnotation(ctx, sqlcgen.UpdateAnnotationParams{
+	row, err := r.queries.UpdateAnnotation(ctx, sqlcgen.UpdateAnnotationParams{
 		Type:        string(ann.Type),
 		Coordinates: string(ann.Coordinates),
 		LabelID:     toNullString(ann.LabelID),
@@ -64,27 +70,31 @@ func (r *AnnotationRepository) Update(ctx context.Context, ann domain.Annotation
 	return toAnnotation(row), nil
 }
 
+// Delete removes an annotation by ID.
 func (r *AnnotationRepository) Delete(ctx context.Context, id string) error {
-	return r.q.DeleteAnnotation(ctx, id)
+	return r.queries.DeleteAnnotation(ctx, id)
 }
 
-// BulkReplace deletes all annotations for an image and inserts new ones in a transaction.
+// BulkReplace replaces all annotations for an image and returns the persisted rows.
+// The operation is atomic: if any insert fails, the previous annotation set remains in place.
 func (r *AnnotationRepository) BulkReplace(ctx context.Context, imageID string, annotations []domain.Annotation) ([]domain.Annotation, error) {
+	// Why: Phase 1のUIは画像単位の同期保存なので、差分操作ではなく全置換で保存境界を単純に保つ。
+	// Why not: Delete後のInsert失敗で空状態を残さないよう、必ず1トランザクションで実行する。
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
-	qtx := r.q.WithTx(tx)
+	txQueries := r.queries.WithTx(tx)
 
-	if err := qtx.DeleteAnnotationsByImage(ctx, imageID); err != nil {
+	if err := txQueries.DeleteAnnotationsByImage(ctx, imageID); err != nil {
 		return nil, err
 	}
 
 	result := make([]domain.Annotation, len(annotations))
 	for i, ann := range annotations {
-		row, err := qtx.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
+		row, err := txQueries.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
 			ID:          ann.ID,
 			ImageID:     imageID,
 			Type:        string(ann.Type),

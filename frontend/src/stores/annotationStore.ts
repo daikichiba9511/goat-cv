@@ -30,6 +30,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   },
 
   addBBox: (imageId, coords, labelId) => {
+    // Why: 保存前でも選択・編集できるように、サーバーIDとは衝突しない一時IDを付ける。
     const ann: Annotation = {
       id: `temp-${++nextTempId}`,
       image_id: imageId,
@@ -75,6 +76,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
 
   save: async (imageId) => {
     const { annotations } = get();
+    // Why: サーバーは空IDを新規Annotationとして扱う。temp IDを送らず永続IDの責任をBackendに寄せる。
     const payload = annotations.map((a) => ({
       id: a.id.startsWith("temp-") ? "" : a.id,
       type: a.type,

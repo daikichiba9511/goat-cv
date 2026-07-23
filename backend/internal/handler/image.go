@@ -42,19 +42,23 @@ func toImageResponse(img domain.Image) imageResponse {
 	}
 }
 
+// ImageHandler serves image metadata and file API routes.
 type ImageHandler struct {
 	uc *usecase.ImageUsecase
 }
 
+// NewImageHandler creates an ImageHandler.
 func NewImageHandler(uc *usecase.ImageUsecase) *ImageHandler {
 	return &ImageHandler{uc: uc}
 }
 
+// ProjectRoutes registers project-scoped image routes.
 func (h *ImageHandler) ProjectRoutes(r chi.Router) {
 	r.Post("/", h.upload)
 	r.Get("/", h.list)
 }
 
+// ImageRoutes returns image-scoped routes.
 func (h *ImageHandler) ImageRoutes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/{imageId}", h.get)

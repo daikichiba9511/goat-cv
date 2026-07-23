@@ -7,32 +7,37 @@ import (
 	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
 )
 
+// ProjectRepository persists projects in SQLite.
 type ProjectRepository struct {
-	q *sqlcgen.Queries
+	queries *sqlcgen.Queries
 }
 
-func NewProjectRepository(q *sqlcgen.Queries) *ProjectRepository {
-	return &ProjectRepository{q: q}
+// NewProjectRepository creates a ProjectRepository.
+func NewProjectRepository(queries *sqlcgen.Queries) *ProjectRepository {
+	return &ProjectRepository{queries: queries}
 }
 
+// Create inserts a project.
 func (r *ProjectRepository) Create(ctx context.Context, id, name string) (domain.Project, error) {
-	row, err := r.q.CreateProject(ctx, sqlcgen.CreateProjectParams{ID: id, Name: name})
+	row, err := r.queries.CreateProject(ctx, sqlcgen.CreateProjectParams{ID: id, Name: name})
 	if err != nil {
 		return domain.Project{}, err
 	}
 	return toProject(row), nil
 }
 
+// Get returns a project by ID.
 func (r *ProjectRepository) Get(ctx context.Context, id string) (domain.Project, error) {
-	row, err := r.q.GetProject(ctx, id)
+	row, err := r.queries.GetProject(ctx, id)
 	if err != nil {
 		return domain.Project{}, err
 	}
 	return toProject(row), nil
 }
 
+// List returns all projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.Project, error) {
-	rows, err := r.q.ListProjects(ctx)
+	rows, err := r.queries.ListProjects(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,14 +48,16 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.Project, error) 
 	return projects, nil
 }
 
+// Update changes a project's name.
 func (r *ProjectRepository) Update(ctx context.Context, id, name string) (domain.Project, error) {
-	row, err := r.q.UpdateProject(ctx, sqlcgen.UpdateProjectParams{Name: name, ID: id})
+	row, err := r.queries.UpdateProject(ctx, sqlcgen.UpdateProjectParams{Name: name, ID: id})
 	if err != nil {
 		return domain.Project{}, err
 	}
 	return toProject(row), nil
 }
 
+// Delete removes a project by ID.
 func (r *ProjectRepository) Delete(ctx context.Context, id string) error {
-	return r.q.DeleteProject(ctx, id)
+	return r.queries.DeleteProject(ctx, id)
 }
