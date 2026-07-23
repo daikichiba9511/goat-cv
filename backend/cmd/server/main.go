@@ -54,18 +54,21 @@ func main() {
 	labelRepo := sqlite.NewLabelRepository(queries)
 	imageRepo := sqlite.NewImageRepository(queries)
 	annotationRepo := sqlite.NewAnnotationRepository(db, queries)
+	edgeRepo := sqlite.NewEdgeRepository(db, queries)
 
 	// Usecases
 	projectUC := usecase.NewProjectUsecase(projectRepo)
 	labelUC := usecase.NewLabelUsecase(labelRepo)
 	imageUC := usecase.NewImageUsecase(imageRepo, storagePath)
 	annotationUC := usecase.NewAnnotationUsecase(annotationRepo)
+	edgeUC := usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo)
 
 	// Handlers
 	projectHandler := handler.NewProjectHandler(projectUC)
 	labelHandler := handler.NewLabelHandler(labelUC)
 	imageHandler := handler.NewImageHandler(imageUC)
 	annotationHandler := handler.NewAnnotationHandler(annotationUC)
+	edgeHandler := handler.NewEdgeHandler(edgeUC)
 	exportHandler := handler.NewExportHandler(projectUC, imageUC, annotationUC, labelUC)
 
 	// Routes
@@ -90,8 +93,12 @@ func main() {
 	r.Route("/api/v1/images/{imageId}/annotations", func(r chi.Router) {
 		annotationHandler.ImageRoutes(r)
 	})
+	r.Route("/api/v1/images/{imageId}/edges", func(r chi.Router) {
+		edgeHandler.ImageRoutes(r)
+	})
 
 	r.Mount("/api/v1/annotations", annotationHandler.AnnotationRoutes())
+	r.Mount("/api/v1/edges", edgeHandler.EdgeRoutes())
 
 	r.Get("/api/v1/images/{imageId}/export", exportHandler.ImageExport)
 

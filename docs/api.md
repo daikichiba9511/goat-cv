@@ -252,7 +252,35 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
   "type": "reading_order",
   "image_id": "0194..."
 }
+
+// PUT /images/:imageId/edges (bulk save)
+// Request
+{
+  "edges": [
+    {
+      "id": "0194...",
+      "source_annotation_id": "0194...",
+      "target_annotation_id": "0194...",
+      "type": "reading_order"
+    }
+  ]
+}
+
+// Response 200
+{
+  "items": [...]
+}
 ```
+
+Validation:
+
+- `source_annotation_id` と `target_annotation_id` は同一 `image_id` の Annotation を参照する
+- self edge は拒否する
+- 同一 `(source_annotation_id, target_annotation_id, type)` の重複は拒否する
+- `reading_order` は閉路を作る Edge を拒否する
+- `key_value` は `key` category から `value` category への 1:1 Edge のみ許可する
+- `table_cell` は `table` category から `cell` category への 1:N Edge のみ許可する
+- `PUT /images/:imageId/edges` は候補グラフ全体を検証し、不正な場合は既存 Edge を変更しない
 
 ### Guidelines
 
