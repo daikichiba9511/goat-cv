@@ -1,7 +1,16 @@
-import { useRef, useEffect, useState, useCallback } from "react";
-import { Stage, Layer, Image as KonvaImage, Rect, Transformer } from "react-konva";
+import { Fragment, useRef, useEffect, useState, useCallback } from "react";
+import {
+  Stage,
+  Layer,
+  Image as KonvaImage,
+  Label as KonvaLabel,
+  Rect,
+  Tag,
+  Text,
+  Transformer,
+} from "react-konva";
 import type Konva from "konva";
-import type { ImageMeta, BBoxCoordinates } from "../../types";
+import type { ImageMeta, BBoxCoordinates, LabelDefinition } from "../../types";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { imageFileUrl } from "../../api/client";
@@ -178,10 +187,29 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const getLabelColor = (labelId: string | null): string => {
-    if (!labelId) return "#3B82F6";
+  const findLabel = (labelId: string | null): LabelDefinition | null => {
+    if (!labelId) return null;
     const label = labels.find((l) => l.id === labelId);
-    return label?.color ?? "#3B82F6";
+    return label ?? null;
+  };
+
+  const getLabelColor = (labelId: string | null): string => {
+    return findLabel(labelId)?.color ?? "#64748B";
+  };
+
+  const getLabelName = (labelId: string | null): string => {
+    if (!labelId) return "No label";
+    return findLabel(labelId)?.name ?? "Unknown label";
+  };
+
+  const getLabelTextColor = (backgroundColor: string): string => {
+    const hex = backgroundColor.replace("#", "");
+    if (hex.length !== 6) return "#FFFFFF";
+    const red = parseInt(hex.slice(0, 2), 16);
+    const green = parseInt(hex.slice(2, 4), 16);
+    const blue = parseInt(hex.slice(4, 6), 16);
+    const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+    return luminance > 160 ? "#111827" : "#FFFFFF";
   };
 
   return (
@@ -227,49 +255,80 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             if (ann.type !== "bbox") return null;
             const coords = ann.coordinates as BBoxCoordinates;
             const color = getLabelColor(ann.label_id);
+            const labelName = getLabelName(ann.label_id);
+            const isSelected = ann.id === selectedId;
+            const x = coords.x * image.width * scale;
+            const y = coords.y * image.height * scale;
+            const width = coords.width * image.width * scale;
+            const height = coords.height * image.height * scale;
+            const labelY = y >= 22 ? y - 22 : y + 4;
             return (
-              <Rect
-                key={ann.id}
-                id={ann.id}
-                x={coords.x * image.width * scale}
-                y={coords.y * image.height * scale}
-                width={coords.width * image.width * scale}
-                height={coords.height * image.height * scale}
-                stroke={color}
-                strokeWidth={2}
-                fill={`${color}20`}
-                draggable={activeTool === "select"}
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  select(ann.id);
-                }}
-                onDragEnd={(e) => {
-                  const node = e.target;
-                  const [nx, ny] = layerToNormalized(node.x(), node.y());
-                  updateCoordinates(ann.id, {
-                    ...coords,
-                    x: nx,
-                    y: ny,
-                  });
-                }}
-                onTransformEnd={(e) => {
-                  const node = e.target;
-                  const scaleX = node.scaleX();
-                  const scaleY = node.scaleY();
-                  // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
-                  node.scaleX(1);
-                  node.scaleY(1);
-                  const [nx, ny] = layerToNormalized(node.x(), node.y());
-                  const [nw] = layerToNormalized(node.width() * scaleX, 0);
-                  const [, nh] = layerToNormalized(0, node.height() * scaleY);
-                  updateCoordinates(ann.id, {
-                    x: nx,
-                    y: ny,
-                    width: nw,
-                    height: nh,
-                  });
-                }}
-              />
+              <Fragment key={ann.id}>
+                <Rect
+                  id={ann.id}
+                  x={x}
+                  y={y}
+                  width={width}
+                  height={height}
+                  stroke={color}
+                  strokeWidth={isSelected ? 3 : 2}
+                  fill={`${color}20`}
+                  shadowColor={isSelected ? color : undefined}
+                  shadowBlur={isSelected ? 8 : 0}
+                  draggable={activeTool === "select"}
+                  onClick={(e) => {
+                    e.cancelBubble = true;
+                    select(ann.id);
+                  }}
+                  onDragEnd={(e) => {
+                    const node = e.target;
+                    const [nx, ny] = layerToNormalized(node.x(), node.y());
+                    updateCoordinates(ann.id, {
+                      ...coords,
+                      x: nx,
+                      y: ny,
+                    });
+                  }}
+                  onTransformEnd={(e) => {
+                    const node = e.target;
+                    const scaleX = node.scaleX();
+                    const scaleY = node.scaleY();
+                    // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
+                    node.scaleX(1);
+                    node.scaleY(1);
+                    const [nx, ny] = layerToNormalized(node.x(), node.y());
+                    const [nw] = layerToNormalized(node.width() * scaleX, 0);
+                    const [, nh] = layerToNormalized(0, node.height() * scaleY);
+                    updateCoordinates(ann.id, {
+                      x: nx,
+                      y: ny,
+                      width: nw,
+                      height: nh,
+                    });
+                  }}
+                />
+                <KonvaLabel
+                  x={x}
+                  y={labelY}
+                  listening={false}
+                  opacity={isSelected ? 1 : 0.92}
+                >
+                  <Tag
+                    fill={color}
+                    cornerRadius={3}
+                    stroke={isSelected ? "#111827" : color}
+                    strokeWidth={isSelected ? 1 : 0}
+                  />
+                  <Text
+                    text={labelName}
+                    fontSize={12}
+                    fontStyle="bold"
+                    lineHeight={1}
+                    padding={5}
+                    fill={getLabelTextColor(color)}
+                  />
+                </KonvaLabel>
+              </Fragment>
             );
           })}
 
