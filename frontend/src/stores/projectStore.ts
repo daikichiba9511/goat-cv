@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Project, LabelDefinition, ImageMeta } from "../types";
+import type { Project, LabelDefinition, ImageMeta, LabelCategory } from "../types";
 import * as api from "../api/client";
 
 type ProjectStore = {
@@ -17,7 +17,13 @@ type ProjectStore = {
   createLabel: (
     name: string,
     color: string,
-    category: string,
+    category: LabelCategory,
+  ) => Promise<void>;
+  updateLabel: (
+    id: string,
+    name: string,
+    color: string,
+    category: LabelCategory,
   ) => Promise<void>;
   deleteLabel: (id: string) => Promise<void>;
 
@@ -67,12 +73,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   createLabel: async (name, color, category) => {
     const project = get().currentProject;
     if (!project) return;
-    await api.createLabel(
-      project.id,
-      name,
-      color,
-      category as LabelDefinition["category"],
-    );
+    await api.createLabel(project.id, name, color, category);
+    await get().fetchLabels();
+  },
+
+  updateLabel: async (id, name, color, category) => {
+    const project = get().currentProject;
+    if (!project) return;
+    await api.updateLabel(id, project.id, name, color, category);
     await get().fetchLabels();
   },
 
