@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Annotation, Edge } from "../types";
+import type { Annotation, Edge, LabelDefinition } from "../types";
 import * as api from "../api/client";
 import { useAnnotationStore } from "./annotationStore";
 
@@ -187,5 +187,167 @@ describe("annotationStore save", () => {
     expect(state.annotations).toEqual([otherImageAnnotation]);
     expect(state.dirty).toBe(false);
     expect(state.saving).toBe(false);
+  });
+});
+
+const edgeLabels: LabelDefinition[] = [
+  { id: "label-key", project_id: "project-1", name: "Key", color: "#0F766E", category: "key" },
+  { id: "label-value", project_id: "project-1", name: "Value", color: "#2563EB", category: "value" },
+  { id: "label-table", project_id: "project-1", name: "Table", color: "#C2410C", category: "table" },
+  { id: "label-cell", project_id: "project-1", name: "Cell", color: "#9333EA", category: "cell" },
+];
+
+const edgeAnnotations: Annotation[] = [
+  { ...initialAnnotations[0], id: "annotation-a", label_id: null },
+  { ...initialAnnotations[1], id: "annotation-b", label_id: null },
+  { ...initialAnnotations[0], id: "annotation-key", label_id: "label-key" },
+  { ...initialAnnotations[1], id: "annotation-key-2", label_id: "label-key" },
+  { ...initialAnnotations[0], id: "annotation-value", label_id: "label-value" },
+  { ...initialAnnotations[1], id: "annotation-value-2", label_id: "label-value" },
+  { ...initialAnnotations[0], id: "annotation-table", label_id: "label-table" },
+  { ...initialAnnotations[1], id: "annotation-table-2", label_id: "label-table" },
+  { ...initialAnnotations[0], id: "annotation-cell", label_id: "label-cell" },
+  { ...initialAnnotations[1], id: "annotation-cell-2", label_id: "label-cell" },
+];
+
+describe("annotationStore edge editing", () => {
+  beforeEach(() => {
+    useAnnotationStore.setState({
+      loadedImageId: "image-1",
+      annotations: edgeAnnotations,
+      edges: [],
+      selectedId: null,
+      selectedEdgeId: null,
+      edgeSourceId: null,
+      edgeType: "reading_order",
+      edgeDraftError: null,
+      dirty: false,
+      saving: false,
+      saveError: null,
+      revision: 0,
+    });
+  });
+
+  it("creates each relation in the selected direction and continues from the useful endpoint", () => {
+    const store = useAnnotationStore.getState();
+
+    store.connectEdge("image-1", "annotation-a", edgeLabels);
+    store.connectEdge("image-1", "annotation-b", edgeLabels);
+    expect(useAnnotationStore.getState().edgeSourceId).toBe("annotation-b");
+
+    store.setEdgeType("key_value");
+    store.connectEdge("image-1", "annotation-key", edgeLabels);
+    store.connectEdge("image-1", "annotation-value", edgeLabels);
+    expect(useAnnotationStore.getState().edgeSourceId).toBeNull();
+
+    store.setEdgeType("table_cell");
+    store.connectEdge("image-1", "annotation-table", edgeLabels);
+    store.connectEdge("image-1", "annotation-cell", edgeLabels);
+
+    expect(useAnnotationStore.getState().edges.map((edge) => ({
+      source: edge.source_annotation_id,
+      target: edge.target_annotation_id,
+      type: edge.type,
+    }))).toEqual([
+      { source: "annotation-a", target: "annotation-b", type: "reading_order" },
+      { source: "annotation-key", target: "annotation-value", type: "key_value" },
+      { source: "annotation-table", target: "annotation-cell", type: "table_cell" },
+    ]);
+    expect(useAnnotationStore.getState().edgeSourceId).toBe("annotation-table");
+  });
+
+  it("rejects annotations with the wrong source or target category and exposes the reason", () => {
+    const store = useAnnotationStore.getState();
+    store.setEdgeType("key_value");
+
+    store.connectEdge("image-1", "annotation-value", edgeLabels);
+    expect(useAnnotationStore.getState().edges).toEqual([]);
+    expect(useAnnotationStore.getState().edgeSourceId).toBeNull();
+    expect(useAnnotationStore.getState().edgeDraftError).toMatch(/Key label/);
+
+    store.connectEdge("image-1", "annotation-key", edgeLabels);
+    store.connectEdge("image-1", "annotation-cell", edgeLabels);
+    expect(useAnnotationStore.getState().edges).toEqual([]);
+    expect(useAnnotationStore.getState().edgeSourceId).toBe("annotation-key");
+    expect(useAnnotationStore.getState().edgeDraftError).toMatch(/Value label/);
+  });
+
+  it("rejects key-value and table-cell cardinality violations", () => {
+    const store = useAnnotationStore.getState();
+    store.setEdgeType("key_value");
+    store.connectEdge("image-1", "annotation-key", edgeLabels);
+    store.connectEdge("image-1", "annotation-value", edgeLabels);
+    store.connectEdge("image-1", "annotation-key", edgeLabels);
+    store.connectEdge("image-1", "annotation-value-2", edgeLabels);
+    expect(useAnnotationStore.getState().edges).toHaveLength(1);
+    expect(useAnnotationStore.getState().edgeDraftError).toMatch(/already has a Value/);
+
+    store.setEdgeType("table_cell");
+    store.connectEdge("image-1", "annotation-table", edgeLabels);
+    store.connectEdge("image-1", "annotation-cell", edgeLabels);
+    store.cancelEdgeDraft();
+    store.connectEdge("image-1", "annotation-table-2", edgeLabels);
+    store.connectEdge("image-1", "annotation-cell", edgeLabels);
+    expect(useAnnotationStore.getState().edges).toHaveLength(2);
+    expect(useAnnotationStore.getState().edgeDraftError).toMatch(/already belongs to a Table/);
+  });
+
+  it("rejects a reading-order cycle and still allows the relation to be deleted", () => {
+    const store = useAnnotationStore.getState();
+    store.connectEdge("image-1", "annotation-a", edgeLabels);
+    store.connectEdge("image-1", "annotation-b", edgeLabels);
+    store.connectEdge("image-1", "annotation-a", edgeLabels);
+
+    expect(useAnnotationStore.getState().edges).toHaveLength(1);
+    expect(useAnnotationStore.getState().edgeDraftError).toMatch(/cycle/);
+
+    const edgeId = useAnnotationStore.getState().edges[0].id;
+    store.removeEdge(edgeId);
+    expect(useAnnotationStore.getState().edges).toEqual([]);
+  });
+
+  it("discards the unfinished relation when the edge type changes", () => {
+    const store = useAnnotationStore.getState();
+    store.connectEdge("image-1", "annotation-a", edgeLabels);
+    store.setEdgeType("key_value");
+
+    const state = useAnnotationStore.getState();
+    expect(state.edges).toEqual([]);
+    expect(state.edgeSourceId).toBeNull();
+    expect(state.edgeDraftError).toBeNull();
+    expect(state.edgeType).toBe("key_value");
+    expect(state.dirty).toBe(false);
+  });
+
+  it("reloads every relation type without changing its direction", async () => {
+    const reloadedEdges: Edge[] = [
+      {
+        id: "edge-order",
+        image_id: "image-1",
+        source_annotation_id: "annotation-a",
+        target_annotation_id: "annotation-b",
+        type: "reading_order",
+      },
+      {
+        id: "edge-key-value",
+        image_id: "image-1",
+        source_annotation_id: "annotation-key",
+        target_annotation_id: "annotation-value",
+        type: "key_value",
+      },
+      {
+        id: "edge-table-cell",
+        image_id: "image-1",
+        source_annotation_id: "annotation-table",
+        target_annotation_id: "annotation-cell",
+        type: "table_cell",
+      },
+    ];
+    vi.mocked(api.listAnnotations).mockResolvedValue({ items: edgeAnnotations });
+    vi.mocked(api.listEdges).mockResolvedValue({ items: reloadedEdges });
+
+    await useAnnotationStore.getState().loadAnnotations("image-1");
+
+    expect(useAnnotationStore.getState().edges).toEqual(reloadedEdges);
   });
 });

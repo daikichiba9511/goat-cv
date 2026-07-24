@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GitBranch, Trash2 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { Annotation, LabelDefinition } from "../../types";
+import { categoryLabel } from "../../edgeRelations";
 import { useAnnotationStore } from "../../stores/annotationStore";
 
 type Props = {
@@ -114,6 +115,7 @@ export default function AnnotationInspector({ labels, onSelectAnnotation }: Prop
           const labelName = annotation.label_id ? label?.name ?? "Unknown label" : "No label";
           const labelColor = label?.color ?? "#64748B";
           const shapeName = annotation.type === "bbox" ? "BBox" : "Polygon";
+          const categoryName = label ? categoryLabel(label.category) : "Unlabeled";
           const connectionCount = connectionCountByAnnotationId.get(annotation.id) ?? 0;
           const connectionText = `${connectionCount} connection${connectionCount === 1 ? "" : "s"}`;
           const isSelected = annotation.id === selectedId;
@@ -150,7 +152,7 @@ export default function AnnotationInspector({ labels, onSelectAnnotation }: Prop
                     {labelName}
                   </span>
                   <span className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{shapeName}</span>
+                    <span>{categoryName} / {shapeName}</span>
                     <span className="inline-flex items-center gap-1">
                       <GitBranch aria-hidden="true" size={12} strokeWidth={1.75} />
                       {connectionText}

@@ -76,6 +76,10 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - `reading_order` は DAG とし、閉路を作成できない
 - `key_value` は Key category から Value category への 1:1 関係とする
 - `table_cell` は Table category から Cell category への 1:N 関係とする
+- Edge 作成時は relation type と source、target の Label category 条件を確認できる
+- 条件違反、重複、多重度違反、循環を作る操作は編集グラフへ追加せず、拒否理由を表示する
+- relation type を切り替えた場合は、選択途中の source を破棄する
+- Edge type は Canvas 上の色、線種、短い名称で区別する
 
 ### Workflow and QA
 

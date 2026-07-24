@@ -40,8 +40,8 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     edgeSourceId,
     select,
     selectEdge,
-    setEdgeSource,
-    addReadingOrderEdge,
+    connectEdge,
+    cancelEdgeDraft,
     addBBox,
     updateCoordinates,
     remove,
@@ -54,8 +54,8 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     edgeSourceId: state.edgeSourceId,
     select: state.select,
     selectEdge: state.selectEdge,
-    setEdgeSource: state.setEdgeSource,
-    addReadingOrderEdge: state.addReadingOrderEdge,
+    connectEdge: state.connectEdge,
+    cancelEdgeDraft: state.cancelEdgeDraft,
     addBBox: state.addBBox,
     updateCoordinates: state.updateCoordinates,
     remove: state.remove,
@@ -226,7 +226,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
       select(null);
     }
     if (activeTool === "edge" && (e.target === stageRef.current || e.target.getClassName() === "Image")) {
-      setEdgeSource(null);
+      cancelEdgeDraft();
       selectEdge(null);
     }
   };
@@ -252,20 +252,15 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
 
   const handleAnnotationClick = useCallback((annotationId: string) => {
     if (activeTool === "edge") {
-      if (!edgeSourceId) {
-        setEdgeSource(annotationId);
-      } else {
-        addReadingOrderEdge(image.id, edgeSourceId, annotationId);
-      }
+      connectEdge(image.id, annotationId, labels);
       return;
     }
     select(annotationId);
   }, [
     activeTool,
-    edgeSourceId,
-    setEdgeSource,
-    addReadingOrderEdge,
+    connectEdge,
     image.id,
+    labels,
     select,
   ]);
 
@@ -319,6 +314,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             imageWidth={image.width}
             imageHeight={image.height}
             scale={scale}
+            compactLabels={stageSize.width < 480}
             onAnnotationClick={handleAnnotationClick}
             onEdgeClick={selectEdge}
             onCoordinatesChange={updateCoordinates}
