@@ -30,7 +30,7 @@ Zoom/Pan は Konva Stage の scale/position で制御し、座標変換には影
 
 ## Affine Transform
 
-Image 単位でアフィン変換（回転・反転）を適用し、表示を補正する。
+Image 単位でアフィン変換（回転と反転）を適用し、表示を補正する。
 座標は **変換後の座標空間** で記録する（annotator が見たまま = 座標）。
 
 ### Supported Transforms
@@ -59,9 +59,9 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
 ### Transform Pipeline
 
 ```
-原画像ファイル → rotation適用 → flip適用 → 表示画像
-                                            ↑
-                                    この座標空間でアノテーション
+原画像ファイル → source軸のflip_h/flip_v → 時計回りrotation → 表示画像
+                                                            ↑
+                                                    この座標空間でアノテーション
 ```
 
 - Backend: 画像ファイル自体は変換しない。変換メタデータのみ保存
@@ -446,8 +446,8 @@ Validation and transaction rules:
 
 | Method | Path | Description | Phase |
 |--------|------|-------------|-------|
-| `GET` | `/projects/:projectId/export?format=json` | プロジェクト全体エクスポート | 1 |
-| `GET` | `/images/:imageId/export?format=json` | 画像単位エクスポート | 1 |
+| `GET` | `/projects/:projectId/export?format=json\|coco\|yolo` | プロジェクト全体エクスポート | 1, 3 |
+| `GET` | `/images/:imageId/export?format=json` | 画像単位GOAT JSONエクスポート | 1 |
 
 #### Supported Formats
 
@@ -457,7 +457,52 @@ Validation and transaction rules:
 | **COCO** | `coco` | COCO Object Detection format | 3 |
 | **YOLO** | `yolo` | YOLO txt format | 3 |
 
-COCO/YOLO はノード（Annotation）のみ対応。エッジ（Reading Order, KV等）のグラフ構造は GOAT JSON でのみエクスポート可能。
+`format`を省略した場合は`json`として扱う。
+未対応の`format`、または画像単位APIへの`coco`と`yolo`の指定は`400 Bad Request`を返す。
+
+COCOとYOLOはProject単位のZIPを返す。
+どちらも保存中の原画像を同梱し、変換後の正規化Annotation座標を原画像の座標空間へ戻してから出力する。
+変換は表示行列の逆順で`rotation^-1 → flip_v^-1 → flip_h^-1`を各点へ適用する。
+BBoxは4隅を変換した後の外接矩形、Polygonは各頂点を変換した結果を使用する。
+
+COCOは全Label categoryのBBoxとPolygonを対象にし、category IDを1から割り当てる。
+YOLOは`object` categoryのBBoxだけを対象にし、class IDを0から割り当てる。
+Labelは名前、Label IDの順で安定ソートしてIDを決める。
+COCOの`categories[].goat_label_id`とYOLOの`classes.json`により、変換後のclass IDからLabel IDを復元できる。
+
+YOLOで対象外となるPolygonと`object`以外のAnnotationは`manifest.json`の`warnings`へAnnotation IDと理由を記録する。
+座標Schemaが不正なAnnotation、LabelのないAnnotation、Project外のLabelを参照するAnnotationは変換不能として`422 Unprocessable Entity`を返し、ZIPを生成しない。
+空のProjectは空の画像一覧とAnnotation一覧、定義済みのクラス対応を持つ有効なZIPとして返す。
+
+COCO/YOLOはノード（Annotation）のみ対応する。
+エッジ（Reading Order、KV等）のグラフ構造を収録しないことは、各ZIPの`manifest.json`へ機械可読な値として記録する。
+
+#### COCO ZIP
+
+```text
+project-coco.zip/
+├── images/default/<image_id>.<ext>
+├── annotations/instances_default.json
+└── manifest.json
+```
+
+COCOの`images`は原画像の`width`と`height`を持つ。
+BBoxはピクセル単位の`bbox: [x, y, width, height]`として出力する。
+Polygonはピクセル単位の`segmentation`、外接`bbox`、shoelace formulaで計算した`area`として出力する。
+
+#### YOLO ZIP
+
+```text
+project-yolo.zip/
+├── images/train/<image_id>.<ext>
+├── labels/train/<image_id>.txt
+├── data.yaml
+├── classes.json
+└── manifest.json
+```
+
+YOLOの各行は`class_id center_x center_y width height`であり、座標は原画像空間の0から1までの正規化値とする。
+Annotationのない画像にも空のLabel fileを作成し、画像とAnnotation fileを1対1で対応させる。
 
 #### GOAT JSON Format
 

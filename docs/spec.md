@@ -98,8 +98,12 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 - GOAT JSON は Project または Image 単位でエクスポートできる
 - GOAT JSON は Annotation、Edge、LabelDefinition、Image transform 情報を保持する
-- COCO export は BBox/Polygon の node annotation を対象にする
-- YOLO export は BBox の object detection annotation を対象にする
+- COCO export は全 Label category の BBox と Polygon を対象にする
+- YOLO export は `object` category の BBox だけを対象にする
+- COCO と YOLO は Project 単位の ZIP として、原画像、Annotation、クラスと Label ID の対応、Export 制約を取得できる
+- COCO と YOLO は原画像をそのまま同梱し、変換後の正規化座標を原画像の座標空間へ逆変換する
+- YOLO で対象外となる有効な Annotation は `manifest.json` の警告へ記録し、黙って欠落させない
+- 座標 Schema が不正な Annotation、Label のない Annotation、別 Project の Label を参照する Annotation が1件でもあれば COCO/YOLO export 全体を失敗させる
 - Edge を含むグラフ構造は GOAT JSON のみで完全に保持する
 
 ### Pre-Inference
@@ -150,5 +154,4 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 - Phase 6 の共同編集方式は WebSocket 差分同期、CRDT、OT のどれを採用するか
 - Reviewer と Annotator の権限をいつ導入するか
-- COCO/YOLO export で Label category をどのようにフィルタするか
 - Pre-Inference のモデルAPI形式を GOAT 固有にするか、設定で複数形式を許容するか
