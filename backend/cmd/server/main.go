@@ -37,6 +37,15 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
+	router := buildRouter(db, storagePath)
+	log.Printf("starting server on %s", addr)
+	if err := http.ListenAndServe(addr, router); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}
+
+// buildRouterは実行binaryとHTTP contract testで同じ依存注入とroute assemblyを共有する。
+func buildRouter(db *sql.DB, storagePath string) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -134,11 +143,7 @@ func main() {
 	r.Mount("/api/v1/edges", edgeHandler.EdgeRoutes())
 
 	r.Get("/api/v1/images/{imageId}/export", exportHandler.ImageExport)
-
-	log.Printf("starting server on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
-		log.Fatalf("server failed: %v", err)
-	}
+	return r
 }
 
 func runMigrations(db *sql.DB) error {
