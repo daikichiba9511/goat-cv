@@ -368,6 +368,17 @@ Validation:
       "target_annotation_client_id": "existing-annotation-client-id",
       "type": "reading_order"
     }
+  ],
+  "candidate_decisions": [
+    {
+      "candidate_id": "0196...",
+      "decision": "accept",
+      "annotation_client_id": "temp-annotation-1"
+    },
+    {
+      "candidate_id": "0197...",
+      "decision": "discard"
+    }
   ]
 }
 
@@ -408,6 +419,20 @@ Validation:
         "type": "reading_order"
       }
     }
+  ],
+  "candidate_decisions": [
+    {
+      "candidate_id": "0196...",
+      "state": "accepted",
+      "accepted_annotation_id": "0194...",
+      "decided_at": "2026-07-24T12:05:00Z"
+    },
+    {
+      "candidate_id": "0197...",
+      "state": "discarded",
+      "accepted_annotation_id": null,
+      "decided_at": "2026-07-24T12:05:00Z"
+    }
   ]
 }
 ```
@@ -418,9 +443,213 @@ Validation and transaction rules:
 - `client_id` は各配列内で一意なrequest-local IDとし、新規・既存Resourceの両方で必須とする
 - `id` は既存の永続IDを更新する場合に送り、新規Resourceでは空文字列とする
 - Edge端点は永続IDや配列位置ではなく、同じRequest内のAnnotation `client_id`を参照する
-- Annotation、client参照、Edge集合をすべて検証してから、削除・Annotation挿入・Edge挿入を1つのDB Transactionで実行する
-- 検証またはDB処理に失敗した場合、既存のAnnotationとEdgeをどちらも変更しない
+- Annotation、client参照、Edge集合はRepositoryを呼ぶ前に検証する
+- `candidate_decisions`は省略または空配列を許可し、その場合はCandidateを変更しない
+- `accept`は同じRequest内の新規Annotation `client_id`を1つ参照し、`discard`はAnnotationを参照しない
+- Candidateは同じImageのCurrent Runに属する`pending`状態でなければならない
+- CandidateのCurrent Run、transform、stateに関するguardはTransaction内でも再確認し、Annotation、Edge、Candidate判断を1つのDB Transactionで実行する
+- 検証またはDB処理に失敗した場合、既存のAnnotation、Edge、Candidateを変更しない
 - Responseの配列順は対応付けの契約に含めず、Clientは各Itemの`client_id`で永続Resourceを特定する
+
+### Pre-Inference
+
+Pre-InferenceのProvider境界、状態遷移、再実行規則は[Pre-Inference Integration Specification](pre-inference.md)に従う。
+
+| Method | Path | Description | Phase |
+|--------|------|-------------|-------|
+| `GET` | `/inference-providers` | 設定済みProviderとmodelの一覧 | 5 |
+| `POST` | `/images/:imageId/inference-runs` | Image単位のInference Run実行 | 5 |
+| `GET` | `/inference-runs/:runId` | Run結果の取得 | 5 |
+| `GET` | `/images/:imageId/inference-runs/current` | Current RunとCandidateの取得 | 5 |
+| `GET` | `/projects/:projectId/inference-label-mappings?provider_id=:providerId&model_id=:modelId` | Label Mapping一覧 | 5 |
+| `PUT` | `/projects/:projectId/inference-label-mappings` | 1つのProviderとmodelに対するLabel Mapping全置換 | 5 |
+
+#### Configured Providers
+
+```jsonc
+// GET /inference-providers
+// Response 200
+{
+  "items": [
+    {
+      "id": "local-detection",
+      "models": [
+        {
+          "id": "invoice-layout-v1",
+          "display_name": "Invoice layout v1"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Responseには設定IDと表示名だけを含め、endpoint URL、認証情報、timeoutを公開しない。
+Providerが設定されていない場合は`items: []`を返す。
+
+#### Run Execution
+
+```jsonc
+// POST /images/:imageId/inference-runs
+// Header
+Idempotency-Key: 0198...
+
+// Request
+{
+  "provider_id": "local-detection",
+  "model_id": "invoice-layout-v1"
+}
+
+// Response 201
+{
+  "run": {
+    "id": "0199...",
+    "image_id": "0194...",
+    "provider_id": "local-detection",
+    "model_id": "invoice-layout-v1",
+    "model_version": "2026-07-24.1",
+    "status": "succeeded",
+    "transform_fingerprint": "sha256:...",
+    "warnings": [
+      {
+        "index": 3,
+        "code": "invalid_coordinates",
+        "message": "bbox exceeds normalized image bounds"
+      }
+    ],
+    "error_code": null,
+    "error_message": null,
+    "started_at": "2026-07-24T12:00:00Z",
+    "completed_at": "2026-07-24T12:00:02Z",
+    "superseded_by_run_id": null
+  },
+  "candidates": [
+    {
+      "id": "019a...",
+      "run_id": "0199...",
+      "image_id": "0194...",
+      "external_id": "detection-42",
+      "type": "bbox",
+      "coordinates": {
+        "x": 0.10,
+        "y": 0.20,
+        "width": 0.30,
+        "height": 0.05
+      },
+      "confidence": 0.94,
+      "external_label_key": "0",
+      "external_label_name": "header",
+      "mapped_label_id": "0194...",
+      "state": "pending",
+      "accepted_annotation_id": null,
+      "decided_at": null
+    }
+  ]
+}
+```
+
+Run要求は`Idempotency-Key` headerを必須とし、同じImage内でkeyを一意にする。
+keyは前後の空白を除いた1文字以上128文字以下のvisible ASCIIとする。
+同じkeyと同じRequestの再送ではProviderを呼ばず、既存Runを返す。
+同じkeyで`provider_id`または`model_id`が異なる場合は`409 Conflict`を返す。
+
+最初のRequestはProviderの完了まで待つ。
+成功時は`201 Created`、同じkeyの成功Runを再取得した場合は`200 OK`、同じkeyのRunが実行中なら`202 Accepted`を返す。
+同じkeyの終端Runを再取得した場合は、次のerror分類表に従って元の結果を返す。
+別keyのRunが同じImageで実行中の場合は`409 Conflict`を返す。
+
+Run実行はImage workflowがAnnotation Graph編集を許可する場合に限る。
+許可されないworkflow stateは[Image Workflow Status Specification](workflow-status.md#許可操作)と同じ`409 Conflict`を返す。
+存在しないProviderまたはmodel、欠落したkey、不正なRequestはRunを作らず`400 Bad Request`を返す。
+
+Providerの接続またはHTTPエラーはRunを`failed`として保存し、`502 Bad Gateway`を返す。
+Provider timeoutはRunを`timed_out`として保存し、`504 Gateway Timeout`を返す。
+どちらの場合も以前のCurrent Runを置換しない。
+Provider呼び出し中にImage transformが変わった場合はRunを`failed`、error code `image_changed`として保存し、Candidateを保存せず`409 Conflict`を返す。
+Server起動時に残っていた`running` Runは`failed`、error code `interrupted`へ更新し、新しいRunを妨げない。
+
+| Condition | Run status | Error code | HTTP status | Current Run replacement |
+|-----------|------------|------------|-------------|-------------------------|
+| Provider接続失敗または非成功status | `failed` | `provider_unavailable` | `502 Bad Gateway` | しない |
+| top-level不正、全Item不正、応答上限超過 | `failed` | `invalid_response` | `502 Bad Gateway` | しない |
+| Provider timeout | `timed_out` | `provider_timeout` | `504 Gateway Timeout` | しない |
+| 実行中のImage transform変更 | `failed` | `image_changed` | `409 Conflict` | しない |
+| Client切断 | `failed` | `client_cancelled` | Responseなし。同じkeyの再送では`409 Conflict` | しない |
+| Server再起動で残ったRun | `failed` | `interrupted` | 同じkeyの再送では`409 Conflict` | しない |
+
+```jsonc
+// Response 502
+{
+  "error": "inference provider failed",
+  "run": {
+    "id": "0199...",
+    "status": "failed",
+    "error_code": "provider_unavailable",
+    "error_message": "provider request failed"
+  }
+}
+```
+
+`error_message`は認証情報、Providerの未加工body、内部endpoint URLを含めない。
+`GET /inference-runs/:runId`は同じRunとCandidateのenvelopeを返し、存在しないRun IDには`404 Not Found`を返す。
+
+#### Current Run
+
+```jsonc
+// GET /images/:imageId/inference-runs/current
+// Response 200 when no current run exists
+{
+  "run": null,
+  "candidates": []
+}
+```
+
+Current Runは、現在のImage transform fingerprintと一致し、後続の成功Runにsupersedeされていない最新の成功Runである。
+CandidateはRun内の応答順ではなくCandidate IDの昇順で返す。
+過去RunのCandidateと`accepted`または`discarded`の履歴は`GET /inference-runs/:runId`で取得できるが、Graph保存の判断対象にはできない。
+
+#### Label Mappings
+
+```jsonc
+// PUT /projects/:projectId/inference-label-mappings
+// Request
+{
+  "provider_id": "local-detection",
+  "model_id": "invoice-layout-v1",
+  "mappings": [
+    {
+      "external_label_key": "0",
+      "label_id": "0194..."
+    },
+    {
+      "external_label_key": "1",
+      "label_id": "0195..."
+    }
+  ]
+}
+
+// Response 200
+{
+  "provider_id": "local-detection",
+  "model_id": "invoice-layout-v1",
+  "items": [
+    {
+      "external_label_key": "0",
+      "label_id": "0194..."
+    },
+    {
+      "external_label_key": "1",
+      "label_id": "0195..."
+    }
+  ]
+}
+```
+
+`PUT`は指定したProviderとmodelのMapping集合をProject単位で全置換し、空配列で全Mappingを削除する。
+`GET`と`PUT`は設定済みのProviderとmodelだけを受け付け、不明なIDには`400 Bad Request`を返す。
+`external_label_key`は空文字列を許可せず、Request内で一意とする。
+`label_id`が存在しない場合または別Projectに属する場合はRequest全体を`400 Bad Request`として拒否し、既存Mappingを変更しない。
+Mapping変更は既存Candidateと実行中Runのsnapshotを変更せず、変更後に開始するRunから適用する。
 
 ### Guidelines
 
