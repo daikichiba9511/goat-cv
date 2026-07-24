@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import type { Tool } from "../../pages/Annotator";
+import type { Tool } from "../../types";
 
 type Props = {
   activeTool: Tool;

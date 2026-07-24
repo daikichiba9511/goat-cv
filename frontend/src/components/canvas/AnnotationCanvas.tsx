@@ -1,21 +1,19 @@
-import { Fragment, useMemo, useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import {
-  Arrow,
   Stage,
   Layer,
   Image as KonvaImage,
-  Label as KonvaLabel,
   Rect,
-  Tag,
-  Text,
   Transformer,
 } from "react-konva";
 import type Konva from "konva";
-import type { ImageMeta, BBoxCoordinates, LabelDefinition } from "../../types";
+import { useShallow } from "zustand/react/shallow";
+import type { ImageMeta, Tool } from "../../types";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { imageFileUrl } from "../../api/client";
-import type { Tool } from "../../pages/Annotator";
+import AnnotationOverlay from "./AnnotationOverlay";
+import { normalizeBBox } from "./annotationGeometry";
 
 type Props = {
   image: ImageMeta;
@@ -23,28 +21,14 @@ type Props = {
   activeLabel: string | null;
 };
 
-type DisplayBBox = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  centerX: number;
-  centerY: number;
-};
-
-function edgeEndpointScale(deltaX: number, deltaY: number, width: number, height: number): number {
-  const widthScale = deltaX === 0 ? Number.POSITIVE_INFINITY : Math.abs((width / 2) / deltaX);
-  const heightScale = deltaY === 0 ? Number.POSITIVE_INFINITY : Math.abs((height / 2) / deltaY);
-  return Math.min(widthScale, heightScale);
-}
-
 export default function AnnotationCanvas({ image, activeTool, activeLabel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
+  const drawingRectRef = useRef<Konva.Rect>(null);
+  const drawingStartRef = useRef<[number, number] | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [drawing, setDrawing] = useState<BBoxCoordinates | null>(null);
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
@@ -62,8 +46,22 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     updateCoordinates,
     remove,
     removeEdge,
-  } = useAnnotationStore();
-  const { labels } = useProjectStore();
+  } = useAnnotationStore(useShallow((state) => ({
+    annotations: state.annotations,
+    edges: state.edges,
+    selectedId: state.selectedId,
+    selectedEdgeId: state.selectedEdgeId,
+    edgeSourceId: state.edgeSourceId,
+    select: state.select,
+    selectEdge: state.selectEdge,
+    setEdgeSource: state.setEdgeSource,
+    addReadingOrderEdge: state.addReadingOrderEdge,
+    addBBox: state.addBBox,
+    updateCoordinates: state.updateCoordinates,
+    remove: state.remove,
+    removeEdge: state.removeEdge,
+  })));
+  const labels = useProjectStore((state) => state.labels);
 
   // Why: KonvaはHTMLImageElementを描画元にするため、API URLをReact state上の画像要素へ変換する。
   useEffect(() => {
@@ -126,27 +124,6 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     [image.width, image.height, scale],
   );
 
-  const bboxDisplayByAnnotationID = useMemo(() => {
-    const boxes = new Map<string, DisplayBBox>();
-    for (const annotation of annotations) {
-      if (annotation.type !== "bbox") continue;
-      const coords = annotation.coordinates as BBoxCoordinates;
-      const x = coords.x * image.width * scale;
-      const y = coords.y * image.height * scale;
-      const width = coords.width * image.width * scale;
-      const height = coords.height * image.height * scale;
-      boxes.set(annotation.id, {
-        x,
-        y,
-        width,
-        height,
-        centerX: x + width / 2,
-        centerY: y + height / 2,
-      });
-    }
-    return boxes;
-  }, [annotations, image.width, image.height, scale]);
-
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
@@ -181,39 +158,67 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     if (!pos) return;
 
     const [nx, ny] = screenToNormalized(pos.x, pos.y);
-    setDrawing({ x: nx, y: ny, width: 0, height: 0 });
+    drawingStartRef.current = [nx, ny];
+    const drawingRect = drawingRectRef.current;
+    if (drawingRect) {
+      drawingRect.setAttrs({
+        x: nx * image.width * scale,
+        y: ny * image.height * scale,
+        width: 0,
+        height: 0,
+        visible: true,
+      });
+      drawingRect.getLayer()?.batchDraw();
+    }
     select(null);
   };
 
   const handleMouseMove = () => {
-    if (!drawing || activeTool !== "bbox") return;
+    const drawingStart = drawingStartRef.current;
+    if (!drawingStart || activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
     const pos = stage.getPointerPosition();
     if (!pos) return;
 
     const [nx, ny] = screenToNormalized(pos.x, pos.y);
-    setDrawing({
-      ...drawing,
-      width: nx - drawing.x,
-      height: ny - drawing.y,
+    // Why: mousemoveごとのReact再描画を避け、入力中だけKonva Nodeを直接更新する。
+    const drawingRect = drawingRectRef.current;
+    drawingRect?.setAttrs({
+      width: (nx - drawingStart[0]) * image.width * scale,
+      height: (ny - drawingStart[1]) * image.height * scale,
     });
+    drawingRect?.getLayer()?.batchDraw();
   };
 
   const handleMouseUp = () => {
-    if (!drawing || activeTool !== "bbox") return;
+    const drawingStart = drawingStartRef.current;
+    if (!drawingStart || activeTool !== "bbox") return;
+    const stage = stageRef.current;
+    const pos = stage?.getPointerPosition();
+    if (!pos) {
+      drawingStartRef.current = null;
+      drawingRectRef.current?.visible(false);
+      drawingRectRef.current?.getLayer()?.batchDraw();
+      return;
+    }
+    const [nx, ny] = screenToNormalized(pos.x, pos.y);
+
     // Why: annotatorが右下以外へドラッグしても、保存時は正の幅高さを持つBBoxへ正規化する。
-    const coords: BBoxCoordinates = {
-      x: drawing.width < 0 ? drawing.x + drawing.width : drawing.x,
-      y: drawing.height < 0 ? drawing.y + drawing.height : drawing.y,
-      width: Math.abs(drawing.width),
-      height: Math.abs(drawing.height),
-    };
+    const coords = normalizeBBox({
+      x: drawingStart[0],
+      y: drawingStart[1],
+      width: nx - drawingStart[0],
+      height: ny - drawingStart[1],
+    });
     // Why not: クリックや手ぶれでできる微小BBoxはAnnotationとして保存しない。
     if (coords.width > 0.005 && coords.height > 0.005) {
       addBBox(image.id, coords, activeLabel);
     }
-    setDrawing(null);
+    drawingStartRef.current = null;
+    const drawingRect = drawingRectRef.current;
+    drawingRect?.visible(false);
+    drawingRect?.getLayer()?.batchDraw();
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -245,47 +250,24 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const findLabel = (labelId: string | null): LabelDefinition | null => {
-    if (!labelId) return null;
-    const label = labels.find((l) => l.id === labelId);
-    return label ?? null;
-  };
-
-  const getLabelColor = (labelId: string | null): string => {
-    return findLabel(labelId)?.color ?? "#64748B";
-  };
-
-  const getLabelName = (labelId: string | null): string => {
-    if (!labelId) return "No label";
-    return findLabel(labelId)?.name ?? "Unknown label";
-  };
-
-  const getLabelTextColor = (backgroundColor: string): string => {
-    const hex = backgroundColor.replace("#", "");
-    if (hex.length !== 6) return "#FFFFFF";
-    const red = parseInt(hex.slice(0, 2), 16);
-    const green = parseInt(hex.slice(2, 4), 16);
-    const blue = parseInt(hex.slice(4, 6), 16);
-    const luminance = (red * 299 + green * 587 + blue * 114) / 1000;
-    return luminance > 160 ? "#111827" : "#FFFFFF";
-  };
-
-  const getEdgePoints = (sourceBox: DisplayBBox, targetBox: DisplayBBox): [number, number, number, number] => {
-    const deltaX = targetBox.centerX - sourceBox.centerX;
-    const deltaY = targetBox.centerY - sourceBox.centerY;
-    if (deltaX === 0 && deltaY === 0) {
-      return [sourceBox.centerX, sourceBox.centerY, targetBox.centerX, targetBox.centerY];
+  const handleAnnotationClick = useCallback((annotationId: string) => {
+    if (activeTool === "edge") {
+      if (!edgeSourceId) {
+        setEdgeSource(annotationId);
+      } else {
+        addReadingOrderEdge(image.id, edgeSourceId, annotationId);
+      }
+      return;
     }
-
-    const sourceScale = edgeEndpointScale(deltaX, deltaY, sourceBox.width, sourceBox.height);
-    const targetScale = edgeEndpointScale(deltaX, deltaY, targetBox.width, targetBox.height);
-    return [
-      sourceBox.centerX + deltaX * sourceScale,
-      sourceBox.centerY + deltaY * sourceScale,
-      targetBox.centerX - deltaX * targetScale,
-      targetBox.centerY - deltaY * targetScale,
-    ];
-  };
+    select(annotationId);
+  }, [
+    activeTool,
+    edgeSourceId,
+    setEdgeSource,
+    addReadingOrderEdge,
+    image.id,
+    select,
+  ]);
 
   return (
     <div ref={containerRef} className="w-full h-full">
@@ -326,139 +308,37 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             />
           )}
 
-          {edges.map((edge) => {
-            if (edge.type !== "reading_order") return null;
-            const sourceBox = bboxDisplayByAnnotationID.get(edge.source_annotation_id);
-            const targetBox = bboxDisplayByAnnotationID.get(edge.target_annotation_id);
-            if (!sourceBox || !targetBox) return null;
-            const isSelected = edge.id === selectedEdgeId;
-            return (
-              <Arrow
-                key={edge.id}
-                points={getEdgePoints(sourceBox, targetBox)}
-                stroke={isSelected ? "#2563EB" : "#7C3AED"}
-                fill={isSelected ? "#2563EB" : "#7C3AED"}
-                strokeWidth={isSelected ? 3 : 2}
-                pointerLength={8}
-                pointerWidth={8}
-                hitStrokeWidth={14}
-                opacity={0.9}
-                onClick={(e) => {
-                  e.cancelBubble = true;
-                  selectEdge(edge.id);
-                }}
-              />
-            );
-          })}
-
-          {annotations.map((ann) => {
-            if (ann.type !== "bbox") return null;
-            const coords = ann.coordinates as BBoxCoordinates;
-            const color = getLabelColor(ann.label_id);
-            const labelName = getLabelName(ann.label_id);
-            const isSelected = ann.id === selectedId;
-            const isEdgeSource = ann.id === edgeSourceId;
-            const x = coords.x * image.width * scale;
-            const y = coords.y * image.height * scale;
-            const width = coords.width * image.width * scale;
-            const height = coords.height * image.height * scale;
-            const labelY = y >= 22 ? y - 22 : y + 4;
-            return (
-              <Fragment key={ann.id}>
-                <Rect
-                  id={ann.id}
-                  x={x}
-                  y={y}
-                  width={width}
-                  height={height}
-                  stroke={color}
-                  strokeWidth={isSelected || isEdgeSource ? 3 : 2}
-                  fill={`${color}20`}
-                  dash={isEdgeSource && activeTool === "edge" ? [6, 3] : undefined}
-                  shadowColor={isSelected || isEdgeSource ? color : undefined}
-                  shadowBlur={isSelected || isEdgeSource ? 8 : 0}
-                  draggable={activeTool === "select"}
-                  onClick={(e) => {
-                    e.cancelBubble = true;
-                    if (activeTool === "edge") {
-                      if (!edgeSourceId) {
-                        setEdgeSource(ann.id);
-                      } else {
-                        addReadingOrderEdge(image.id, edgeSourceId, ann.id);
-                      }
-                      return;
-                    }
-                    select(ann.id);
-                  }}
-                  onDragEnd={(e) => {
-                    const node = e.target;
-                    const [nx, ny] = layerToNormalized(node.x(), node.y());
-                    updateCoordinates(ann.id, {
-                      ...coords,
-                      x: nx,
-                      y: ny,
-                    });
-                  }}
-                  onTransformEnd={(e) => {
-                    const node = e.target;
-                    const scaleX = node.scaleX();
-                    const scaleY = node.scaleY();
-                    // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
-                    node.scaleX(1);
-                    node.scaleY(1);
-                    const [nx, ny] = layerToNormalized(node.x(), node.y());
-                    const [nw] = layerToNormalized(node.width() * scaleX, 0);
-                    const [, nh] = layerToNormalized(0, node.height() * scaleY);
-                    updateCoordinates(ann.id, {
-                      x: nx,
-                      y: ny,
-                      width: nw,
-                      height: nh,
-                    });
-                  }}
-                />
-                <KonvaLabel
-                  x={x}
-                  y={labelY}
-                  listening={false}
-                  opacity={isSelected || isEdgeSource ? 1 : 0.92}
-                >
-                  <Tag
-                    fill={color}
-                    cornerRadius={3}
-                    stroke={isSelected || isEdgeSource ? "#111827" : color}
-                    strokeWidth={isSelected || isEdgeSource ? 1 : 0}
-                  />
-                  <Text
-                    text={labelName}
-                    fontSize={12}
-                    fontStyle="bold"
-                    lineHeight={1}
-                    padding={5}
-                    fill={getLabelTextColor(color)}
-                  />
-                </KonvaLabel>
-              </Fragment>
-            );
-          })}
-
-          {drawing && (
-            <Rect
-              x={drawing.x * image.width * scale}
-              y={drawing.y * image.height * scale}
-              width={drawing.width * image.width * scale}
-              height={drawing.height * image.height * scale}
-              stroke="#3B82F6"
-              strokeWidth={2}
-              dash={[4, 4]}
-            />
-          )}
+          <AnnotationOverlay
+            annotations={annotations}
+            edges={edges}
+            labels={labels}
+            selectedAnnotationId={selectedId}
+            selectedEdgeId={selectedEdgeId}
+            edgeSourceId={edgeSourceId}
+            activeTool={activeTool}
+            imageWidth={image.width}
+            imageHeight={image.height}
+            scale={scale}
+            onAnnotationClick={handleAnnotationClick}
+            onEdgeClick={selectEdge}
+            onCoordinatesChange={updateCoordinates}
+            layerToNormalized={layerToNormalized}
+          />
 
           <Transformer
             ref={transformerRef}
             rotateEnabled={false}
             keepRatio={false}
             boundBoxFunc={(_, newBox) => newBox}
+          />
+        </Layer>
+
+        <Layer listening={false}>
+          <Rect
+            ref={drawingRectRef}
+            stroke="#3B82F6"
+            strokeWidth={2}
+            dash={[4, 4]}
           />
         </Layer>
       </Stage>

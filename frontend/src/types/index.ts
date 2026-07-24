@@ -1,3 +1,5 @@
+export type Tool = "select" | "bbox" | "edge" | "pan";
+
 export type Project = {
   id: string;
   name: string;

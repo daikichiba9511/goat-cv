@@ -3,13 +3,11 @@ import { useParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
 import { useAnnotationStore } from "../stores/annotationStore";
 import * as api from "../api/client";
-import type { ImageMeta } from "../types";
+import type { ImageMeta, Tool } from "../types";
 import AnnotationCanvas from "../components/canvas/AnnotationCanvas";
 import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
 import LabelPanel from "../components/sidebar/LabelPanel";
-
-export type Tool = "select" | "bbox" | "edge" | "pan";
 
 export default function Annotator() {
   const { projectId } = useParams<{ projectId: string }>();
