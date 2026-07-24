@@ -38,23 +38,10 @@ func (r *ImageGraphRepository) Replace(
 	if err := txQueries.DeleteEdgesByImage(ctx, imageID); err != nil {
 		return nil, nil, err
 	}
-	if err := txQueries.DeleteAnnotationsByImage(ctx, imageID); err != nil {
+	// Why: 同じIDのAnnotationは更新し、削除対象だけを消すことで紐づくCommentを通常保存から守る。
+	persistedAnnotations, err := replaceAnnotations(ctx, txQueries, imageID, annotations)
+	if err != nil {
 		return nil, nil, err
-	}
-
-	persistedAnnotations := make([]domain.Annotation, len(annotations))
-	for annotationIndex, annotation := range annotations {
-		row, err := txQueries.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
-			ID:          annotation.ID,
-			ImageID:     imageID,
-			Type:        string(annotation.Type),
-			Coordinates: string(annotation.Coordinates),
-			LabelID:     toNullString(annotation.LabelID),
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		persistedAnnotations[annotationIndex] = toAnnotation(row)
 	}
 
 	persistedEdges := make([]domain.Edge, len(edges))

@@ -59,6 +59,25 @@ func toGuideline(row sqlcgen.Guideline) domain.Guideline {
 	}
 }
 
+func toComment(row sqlcgen.Comment) domain.Comment {
+	return toCommentWithTargetState(row, false)
+}
+
+func toCommentWithTargetState(row sqlcgen.Comment, targetDeleted bool) domain.Comment {
+	return domain.Comment{
+		ID:            row.ID,
+		ImageID:       row.ImageID,
+		AnnotationID:  fromNullString(row.AnnotationID),
+		Type:          domain.CommentType(row.Type),
+		Body:          row.Body,
+		Author:        row.Author,
+		Resolved:      row.Resolved,
+		TargetDeleted: targetDeleted,
+		CreatedAt:     parseTime(row.CreatedAt),
+		UpdatedAt:     parseTime(row.UpdatedAt),
+	}
+}
+
 func toImage(row sqlcgen.Image) domain.Image {
 	return domain.Image{
 		ID:             row.ID,

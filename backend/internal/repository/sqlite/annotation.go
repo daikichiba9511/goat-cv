@@ -88,27 +88,68 @@ func (r *AnnotationRepository) BulkReplace(ctx context.Context, imageID string, 
 
 	txQueries := r.queries.WithTx(tx)
 
-	if err := txQueries.DeleteAnnotationsByImage(ctx, imageID); err != nil {
+	result, err := replaceAnnotations(ctx, txQueries, imageID, annotations)
+	if err != nil {
 		return nil, err
-	}
-
-	result := make([]domain.Annotation, len(annotations))
-	for i, ann := range annotations {
-		row, err := txQueries.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
-			ID:          ann.ID,
-			ImageID:     imageID,
-			Type:        string(ann.Type),
-			Coordinates: string(ann.Coordinates),
-			LabelID:     toNullString(ann.LabelID),
-		})
-		if err != nil {
-			return nil, err
-		}
-		result[i] = toAnnotation(row)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return result, nil
+}
+
+func replaceAnnotations(
+	ctx context.Context,
+	queries *sqlcgen.Queries,
+	imageID string,
+	annotations []domain.Annotation,
+) ([]domain.Annotation, error) {
+	existingRows, err := queries.ListAnnotationsByImage(ctx, imageID)
+	if err != nil {
+		return nil, err
+	}
+	existingByID := make(map[string]sqlcgen.Annotation, len(existingRows))
+	for _, row := range existingRows {
+		existingByID[row.ID] = row
+	}
+	incomingIDs := make(map[string]struct{}, len(annotations))
+	for _, annotation := range annotations {
+		incomingIDs[annotation.ID] = struct{}{}
+	}
+
+	for annotationID := range existingByID {
+		if _, remains := incomingIDs[annotationID]; remains {
+			continue
+		}
+		if err := queries.DeleteAnnotation(ctx, annotationID); err != nil {
+			return nil, err
+		}
+	}
+
+	persisted := make([]domain.Annotation, len(annotations))
+	for annotationIndex, annotation := range annotations {
+		var row sqlcgen.Annotation
+		if _, exists := existingByID[annotation.ID]; exists {
+			row, err = queries.UpdateAnnotation(ctx, sqlcgen.UpdateAnnotationParams{
+				Type:        string(annotation.Type),
+				Coordinates: string(annotation.Coordinates),
+				LabelID:     toNullString(annotation.LabelID),
+				ID:          annotation.ID,
+			})
+		} else {
+			row, err = queries.CreateAnnotation(ctx, sqlcgen.CreateAnnotationParams{
+				ID:          annotation.ID,
+				ImageID:     imageID,
+				Type:        string(annotation.Type),
+				Coordinates: string(annotation.Coordinates),
+				LabelID:     toNullString(annotation.LabelID),
+			})
+		}
+		if err != nil {
+			return nil, err
+		}
+		persisted[annotationIndex] = toAnnotation(row)
+	}
+	return persisted, nil
 }

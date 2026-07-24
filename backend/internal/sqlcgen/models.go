@@ -17,6 +17,18 @@ type Annotation struct {
 	CreatedAt   string
 }
 
+type Comment struct {
+	ID           string
+	ImageID      string
+	AnnotationID sql.NullString
+	Author       string
+	Body         string
+	Type         string
+	Resolved     bool
+	CreatedAt    string
+	UpdatedAt    string
+}
+
 type Edge struct {
 	ID                 string
 	ImageID            string
