@@ -39,10 +39,11 @@ it("keeps Canvas editing state while the Guidelines tab and inspector are toggle
       activeLabel={null}
       onSelectLabel={() => undefined}
       onSelectAnnotation={() => undefined}
+      currentImageId="image-1"
     />,
   );
 
-  fireEvent.click(screen.getByRole("tab", { name: "Guide" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Guidelines" }));
   fireEvent.click(screen.getByRole("button", { name: "Close inspector" }));
   fireEvent.click(screen.getByRole("button", { name: "Open inspector" }));
 
@@ -50,5 +51,5 @@ it("keeps Canvas editing state while the Guidelines tab and inspector are toggle
   expect(state.selectedId).toBe("annotation-1");
   expect(state.polygonDraftPoints).toEqual([{ x: 0.1, y: 0.2 }]);
   expect(state.dirty).toBe(true);
-  expect(screen.getByRole("tab", { name: "Guide" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("tab", { name: "Guidelines" }).getAttribute("aria-selected")).toBe("true");
 });
