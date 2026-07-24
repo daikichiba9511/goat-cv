@@ -6,6 +6,8 @@ import type {
   EdgeType,
   LabelCategory,
   LabelDefinition,
+  NormalizedPoint,
+  PolygonCoordinates,
 } from "../types";
 import { categoryLabel, EDGE_RELATIONS } from "../edgeRelations";
 import * as api from "../api/client";
@@ -19,6 +21,7 @@ type AnnotationStore = {
   edgeSourceId: string | null;
   edgeType: EdgeType;
   edgeDraftError: string | null;
+  polygonDraftPoints: NormalizedPoint[];
   dirty: boolean;
   saving: boolean;
   saveError: string | null;
@@ -26,13 +29,22 @@ type AnnotationStore = {
 
   loadAnnotations: (imageId: string) => Promise<void>;
   addBBox: (imageId: string, coords: BBoxCoordinates, labelId: string | null) => void;
-  updateCoordinates: (id: string, coords: BBoxCoordinates) => void;
+  updateBBoxCoordinates: (id: string, coords: BBoxCoordinates) => void;
   setLabel: (id: string, labelId: string | null) => void;
   select: (id: string | null) => void;
   selectEdge: (id: string | null) => void;
   setEdgeType: (edgeType: EdgeType) => void;
   connectEdge: (imageId: string, annotationId: string, labels: LabelDefinition[]) => void;
   cancelEdgeDraft: () => void;
+  addPolygonDraftPoint: (point: NormalizedPoint) => void;
+  undoPolygonDraftPoint: () => void;
+  cancelPolygonDraft: () => void;
+  finishPolygon: (imageId: string, labelId: string | null) => boolean;
+  updatePolygonPoint: (
+    annotationId: string,
+    pointIndex: number,
+    point: NormalizedPoint,
+  ) => void;
   remove: (id: string) => void;
   removeEdge: (id: string) => void;
   save: (imageId: string) => Promise<void>;
@@ -41,6 +53,12 @@ type AnnotationStore = {
 
 let nextTempId = 0;
 let nextTempEdgeId = 0;
+
+function isNormalizedPoint(point: NormalizedPoint): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y)
+    && point.x >= 0 && point.x <= 1
+    && point.y >= 0 && point.y <= 1;
+}
 
 function annotationCategory(
   annotation: Annotation,
@@ -168,6 +186,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   edgeSourceId: null,
   edgeType: "reading_order",
   edgeDraftError: null,
+  polygonDraftPoints: [],
   dirty: false,
   saving: false,
   saveError: null,
@@ -187,6 +206,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       edgeSourceId: null,
       edgeType: "reading_order",
       edgeDraftError: null,
+      polygonDraftPoints: [],
       dirty: false,
       saving: false,
       saveError: null,
@@ -210,12 +230,13 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       selectedEdgeId: null,
       edgeSourceId: null,
       edgeDraftError: null,
+      polygonDraftPoints: [],
       dirty: true,
       revision: state.revision + 1,
     }));
   },
 
-  updateCoordinates: (id, coords) => {
+  updateBBoxCoordinates: (id, coords) => {
     set((state) => ({
       annotations: state.annotations.map((annotation) =>
         annotation.id === id ? { ...annotation, coordinates: coords } : annotation,
@@ -324,6 +345,79 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   },
 
   cancelEdgeDraft: () => set({ edgeSourceId: null, edgeDraftError: null }),
+
+  addPolygonDraftPoint: (point) => {
+    if (!isNormalizedPoint(point)) return;
+    set((state) => {
+      const pointExists = state.polygonDraftPoints.some(
+        (existingPoint) => existingPoint.x === point.x && existingPoint.y === point.y,
+      );
+      if (pointExists) return state;
+      return { polygonDraftPoints: [...state.polygonDraftPoints, point] };
+    });
+  },
+
+  undoPolygonDraftPoint: () => set((state) => ({
+    polygonDraftPoints: state.polygonDraftPoints.slice(0, -1),
+  })),
+
+  cancelPolygonDraft: () => set({ polygonDraftPoints: [] }),
+
+  finishPolygon: (imageId, labelId) => {
+    const points = get().polygonDraftPoints;
+    // Why not: Backendと同じく、相異なる3点を持たない輪郭はAnnotationへ昇格させない。
+    if (points.length < 3) return false;
+
+    const annotation: Annotation = {
+      id: `temp-${++nextTempId}`,
+      image_id: imageId,
+      type: "polygon",
+      coordinates: { points },
+      label_id: labelId,
+      created_at: new Date().toISOString(),
+    };
+    set((state) => ({
+      annotations: [...state.annotations, annotation],
+      selectedId: annotation.id,
+      selectedEdgeId: null,
+      edgeSourceId: null,
+      edgeDraftError: null,
+      polygonDraftPoints: [],
+      dirty: true,
+      revision: state.revision + 1,
+    }));
+    return true;
+  },
+
+  updatePolygonPoint: (annotationId, pointIndex, point) => {
+    if (!isNormalizedPoint(point)) return;
+    set((state) => {
+      const annotation = state.annotations.find((item) => item.id === annotationId);
+      if (!annotation || annotation.type !== "polygon") return state;
+      const coordinates = annotation.coordinates as PolygonCoordinates;
+      if (pointIndex < 0 || pointIndex >= coordinates.points.length) return state;
+      const overlapsAnotherPoint = coordinates.points.some(
+        (existingPoint, index) => index !== pointIndex
+          && existingPoint.x === point.x
+          && existingPoint.y === point.y,
+      );
+      // Why not: 重複頂点を許すと、画面上では編集できても保存時にAPIのPolygon検証で拒否される。
+      if (overlapsAnotherPoint) return state;
+
+      const points = coordinates.points.map((existingPoint, index) =>
+        index === pointIndex ? point : existingPoint,
+      );
+      return {
+        annotations: state.annotations.map((item) =>
+          item.id === annotationId
+            ? { ...item, coordinates: { points } }
+            : item,
+        ),
+        dirty: true,
+        revision: state.revision + 1,
+      };
+    });
+  },
 
   remove: (id) => {
     set((state) => ({
@@ -443,6 +537,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
     edgeSourceId: null,
     edgeType: "reading_order",
     edgeDraftError: null,
+    polygonDraftPoints: [],
     dirty: false,
     saving: false,
     saveError: null,

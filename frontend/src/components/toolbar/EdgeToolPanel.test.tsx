@@ -38,6 +38,7 @@ describe("EdgeToolPanel", () => {
       edgeSourceId: keyAnnotation.id,
       edgeType: "key_value",
       edgeDraftError: "Target must use a Value label.",
+      polygonDraftPoints: [],
       dirty: false,
       saving: false,
       saveError: null,

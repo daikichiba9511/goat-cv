@@ -72,6 +72,7 @@ describe("annotationStore save", () => {
       selectedId: "temp-a",
       selectedEdgeId: null,
       edgeSourceId: "temp-a",
+      polygonDraftPoints: [],
       dirty: true,
       saving: false,
       saveError: null,
@@ -153,7 +154,7 @@ describe("annotationStore save", () => {
 
     const savePromise = useAnnotationStore.getState().save("image-1");
     const editedCoordinates = { x: 0.1, y: 0, width: 0.4, height: 1 };
-    useAnnotationStore.getState().updateCoordinates("temp-a", editedCoordinates);
+    useAnnotationStore.getState().updateBBoxCoordinates("temp-a", editedCoordinates);
     resolveSave(savedGraph);
     await savePromise;
 
@@ -221,6 +222,7 @@ describe("annotationStore edge editing", () => {
       edgeSourceId: null,
       edgeType: "reading_order",
       edgeDraftError: null,
+      polygonDraftPoints: [],
       dirty: false,
       saving: false,
       saveError: null,
@@ -349,5 +351,132 @@ describe("annotationStore edge editing", () => {
     await useAnnotationStore.getState().loadAnnotations("image-1");
 
     expect(useAnnotationStore.getState().edges).toEqual(reloadedEdges);
+  });
+});
+
+describe("annotationStore polygon editing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAnnotationStore.setState({
+      loadedImageId: "image-1",
+      annotations: [],
+      edges: [],
+      selectedId: null,
+      selectedEdgeId: null,
+      edgeSourceId: null,
+      edgeType: "reading_order",
+      edgeDraftError: null,
+      polygonDraftPoints: [],
+      dirty: false,
+      saving: false,
+      saveError: null,
+      revision: 0,
+    });
+  });
+
+  it("does not create a polygon from fewer than three points and cancels without dirtying the graph", () => {
+    const store = useAnnotationStore.getState();
+    store.addPolygonDraftPoint({ x: 0.1, y: 0.1 });
+    store.addPolygonDraftPoint({ x: 0.8, y: 0.1 });
+
+    expect(store.finishPolygon("image-1", "label-object")).toBe(false);
+    expect(useAnnotationStore.getState().annotations).toEqual([]);
+    expect(useAnnotationStore.getState().polygonDraftPoints).toHaveLength(2);
+
+    store.cancelPolygonDraft();
+    const state = useAnnotationStore.getState();
+    expect(state.polygonDraftPoints).toEqual([]);
+    expect(state.dirty).toBe(false);
+    expect(state.revision).toBe(0);
+  });
+
+  it("creates a labeled polygon and preserves vertex order through save and reload", async () => {
+    const points = [
+      { x: 0.1, y: 0.2 },
+      { x: 0.8, y: 0.2 },
+      { x: 0.5, y: 0.9 },
+    ];
+    const store = useAnnotationStore.getState();
+    points.forEach(store.addPolygonDraftPoint);
+
+    expect(store.finishPolygon("image-1", "label-object")).toBe(true);
+    const createdPolygon = useAnnotationStore.getState().annotations[0];
+    expect(createdPolygon.type).toBe("polygon");
+    expect(createdPolygon.coordinates).toEqual({ points });
+    expect(createdPolygon.label_id).toBe("label-object");
+    expect(useAnnotationStore.getState().polygonDraftPoints).toEqual([]);
+
+    const savedPolygon = { ...createdPolygon, id: "server-polygon" };
+    vi.mocked(api.saveImageGraph).mockResolvedValue({
+      annotations: [{ client_id: createdPolygon.id, annotation: savedPolygon }],
+      edges: [],
+    });
+    await useAnnotationStore.getState().save("image-1");
+    expect(api.saveImageGraph).toHaveBeenCalledWith("image-1", {
+      annotations: [{
+        client_id: createdPolygon.id,
+        id: "",
+        type: "polygon",
+        coordinates: { points },
+        label_id: "label-object",
+      }],
+      edges: [],
+    });
+
+    vi.mocked(api.listAnnotations).mockResolvedValue({ items: [savedPolygon] });
+    vi.mocked(api.listEdges).mockResolvedValue({ items: [] });
+    await useAnnotationStore.getState().loadAnnotations("image-1");
+    expect(useAnnotationStore.getState().annotations[0]).toEqual(savedPolygon);
+  });
+
+  it("moves one vertex without reordering the polygon and removes connected edges with it", () => {
+    const polygon: Annotation = {
+      id: "polygon-1",
+      image_id: "image-1",
+      type: "polygon",
+      coordinates: {
+        points: [
+          { x: 0.1, y: 0.1 },
+          { x: 0.8, y: 0.1 },
+          { x: 0.5, y: 0.8 },
+        ],
+      },
+      label_id: "label-object",
+      created_at: "2026-07-24T00:00:00Z",
+    };
+    const connectedEdge: Edge = {
+      id: "edge-polygon",
+      image_id: "image-1",
+      source_annotation_id: polygon.id,
+      target_annotation_id: initialAnnotations[0].id,
+      type: "reading_order",
+    };
+    useAnnotationStore.setState({
+      annotations: [polygon, initialAnnotations[0]],
+      edges: [connectedEdge],
+    });
+
+    const store = useAnnotationStore.getState();
+    store.updatePolygonPoint(polygon.id, 1, { x: 0.7, y: 0.3 });
+    expect(useAnnotationStore.getState().annotations[0].coordinates).toEqual({
+      points: [
+        { x: 0.1, y: 0.1 },
+        { x: 0.7, y: 0.3 },
+        { x: 0.5, y: 0.8 },
+      ],
+    });
+
+    store.updatePolygonPoint(polygon.id, 1, { x: 0.1, y: 0.1 });
+    expect(useAnnotationStore.getState().annotations[0].coordinates).toEqual({
+      points: [
+        { x: 0.1, y: 0.1 },
+        { x: 0.7, y: 0.3 },
+        { x: 0.5, y: 0.8 },
+      ],
+    });
+
+    store.remove(polygon.id);
+    expect(useAnnotationStore.getState().annotations).toEqual([initialAnnotations[0]]);
+    expect(useAnnotationStore.getState().edges).toEqual([]);
   });
 });
