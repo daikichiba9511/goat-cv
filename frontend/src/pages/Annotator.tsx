@@ -3,17 +3,29 @@ import { useParams } from "react-router-dom";
 import { useProjectStore } from "../stores/projectStore";
 import { useAnnotationStore } from "../stores/annotationStore";
 import * as api from "../api/client";
-import type { ImageMeta, Tool } from "../types";
+import type { ImageMeta, ImageWorkflowEvent, Tool } from "../types";
+import {
+  executeWorkflowTransition,
+  workflowCapabilitiesFor,
+} from "../workflow";
 import AnnotationCanvas from "../components/canvas/AnnotationCanvas";
 import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
 import EdgeToolPanel from "../components/toolbar/EdgeToolPanel";
 import PolygonToolPanel from "../components/toolbar/PolygonToolPanel";
+import WorkflowControls from "../components/toolbar/WorkflowControls";
 import InspectorSidebar from "../components/sidebar/InspectorSidebar";
 
 export default function Annotator() {
   const { projectId } = useParams<{ projectId: string }>();
-  const { currentProject, selectProject, labels, images } = useProjectStore();
+  const {
+    currentProject,
+    selectProject,
+    labels,
+    images,
+    fetchImages,
+    replaceImage,
+  } = useProjectStore();
   const {
     loadAnnotations,
     save,
@@ -28,6 +40,12 @@ export default function Annotator() {
   const [currentImage, setCurrentImage] = useState<ImageMeta | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const currentImageId = currentImage?.id ?? null;
+  const workflowCapabilities = currentImage
+    ? workflowCapabilitiesFor(currentImage)
+    : { graphEditable: false, transformEditable: false };
 
   useEffect(() => {
     if (projectId) {
@@ -36,15 +54,29 @@ export default function Annotator() {
   }, [projectId, selectProject]);
 
   useEffect(() => {
-    if (currentImage) {
-      loadAnnotations(currentImage.id);
+    if (currentImageId) {
+      loadAnnotations(currentImageId);
     } else {
       clear();
     }
-  }, [currentImage, loadAnnotations, clear]);
+  }, [currentImageId, loadAnnotations, clear]);
+
+  useEffect(() => {
+    if (workflowCapabilities.graphEditable) return;
+    if (activeTool !== "bbox" && activeTool !== "polygon" && activeTool !== "edge") return;
+    cancelEdgeDraft();
+    cancelPolygonDraft();
+    setActiveTool("select");
+  }, [
+    activeTool,
+    cancelEdgeDraft,
+    cancelPolygonDraft,
+    workflowCapabilities.graphEditable,
+  ]);
 
   const handleSelectImage = (img: ImageMeta) => {
     cancelPolygonDraft();
+    setWorkflowError(null);
     setCurrentImage(img);
   };
 
@@ -55,6 +87,12 @@ export default function Annotator() {
   };
 
   const handleToolChange = (tool: Tool) => {
+    if (
+      !workflowCapabilities.graphEditable
+      && (tool === "bbox" || tool === "polygon" || tool === "edge")
+    ) {
+      return;
+    }
     if (tool !== "edge") {
       // Why: Edge toolを離れた後のクリックで、非表示の始点からEdgeが作られないようにする。
       cancelEdgeDraft();
@@ -64,6 +102,32 @@ export default function Annotator() {
       cancelPolygonDraft();
     }
     setActiveTool(tool);
+  };
+
+  const handleWorkflowAction = async (event: ImageWorkflowEvent) => {
+    if (!currentImage || workflowBusy) return;
+    setWorkflowBusy(true);
+    setWorkflowError(null);
+    try {
+      const result = await executeWorkflowTransition({
+        image: currentImage,
+        event,
+        dirty,
+        saveGraph: () => save(currentImage.id),
+        applyEvent: api.applyImageWorkflowEvent,
+        refreshImage: api.getImage,
+      });
+      if (!result.transitionSent) return;
+
+      setCurrentImage(result.image);
+      replaceImage(result.image);
+      await fetchImages();
+      setWorkflowError(result.error);
+    } catch (error) {
+      setWorkflowError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWorkflowBusy(false);
+    }
   };
 
   const handleSelectAnnotation = (annotationId: string) => {
@@ -118,15 +182,29 @@ export default function Annotator() {
           saving={saving}
           saveError={saveError}
           projectName={currentProject.name}
-          imageName={currentImage?.filename ?? null}
-          hasImage={currentImage !== null}
+          image={currentImage}
+          graphEditable={workflowCapabilities.graphEditable}
+          transformEditable={workflowCapabilities.transformEditable}
           onRotate={handleRotate}
           onFlipH={handleFlipH}
           onFlipV={handleFlipV}
         />
 
-        {activeTool === "edge" && currentImage && <EdgeToolPanel />}
-        {activeTool === "polygon" && currentImage && (
+        {currentImage && (
+          <div className="flex min-h-9 flex-shrink-0 items-center border-b bg-white px-2 sm:px-3">
+            <WorkflowControls
+              image={currentImage}
+              busy={workflowBusy}
+              error={workflowError}
+              onAction={handleWorkflowAction}
+            />
+          </div>
+        )}
+
+        {activeTool === "edge" && currentImage && workflowCapabilities.graphEditable && (
+          <EdgeToolPanel />
+        )}
+        {activeTool === "polygon" && currentImage && workflowCapabilities.graphEditable && (
           <PolygonToolPanel imageId={currentImage.id} activeLabelId={activeLabel} />
         )}
 
@@ -136,6 +214,7 @@ export default function Annotator() {
               image={currentImage}
               activeTool={activeTool}
               activeLabel={activeLabel}
+              graphEditable={workflowCapabilities.graphEditable}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -151,6 +230,7 @@ export default function Annotator() {
         onSelectLabel={setActiveLabel}
         onSelectAnnotation={handleSelectAnnotation}
         currentImageId={currentImage?.id ?? null}
+        graphEditable={workflowCapabilities.graphEditable}
       />
     </div>
   );

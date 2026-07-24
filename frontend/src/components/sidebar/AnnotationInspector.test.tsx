@@ -76,6 +76,7 @@ describe("AnnotationInspector", () => {
       <AnnotationInspector
         labels={labels}
         onSelectAnnotation={useAnnotationStore.getState().select}
+        graphEditable
       />,
     );
 
@@ -100,6 +101,7 @@ describe("AnnotationInspector", () => {
       <AnnotationInspector
         labels={labels}
         onSelectAnnotation={useAnnotationStore.getState().select}
+        graphEditable
       />,
     );
 
@@ -126,6 +128,7 @@ describe("AnnotationInspector", () => {
       <AnnotationInspector
         labels={labels}
         onSelectAnnotation={useAnnotationStore.getState().select}
+        graphEditable
       />,
     );
 

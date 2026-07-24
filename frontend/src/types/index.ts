@@ -58,8 +58,23 @@ export type ImageStatus =
   | "annotated"
   | "in_review"
   | "approved"
-  | "rejected"
-  | "escalated";
+  | "rejected";
+
+export type ImageWorkflowEvent =
+  | "annotation_completed"
+  | "annotation_reopened"
+  | "review_started"
+  | "review_cancelled"
+  | "review_approved"
+  | "review_rejected"
+  | "approval_reopened"
+  | "escalation_started"
+  | "escalation_resolved";
+
+export type ImageListFilters = {
+  status?: ImageStatus;
+  escalated?: boolean;
+};
 
 export type ImageMeta = {
   id: string;
@@ -73,6 +88,7 @@ export type ImageMeta = {
   flip_h: boolean;
   flip_v: boolean;
   status: ImageStatus;
+  escalated: boolean;
   uploaded_at: string;
 };
 

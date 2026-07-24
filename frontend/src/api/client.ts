@@ -11,6 +11,8 @@ import type {
   ImageGraphSaveResponse,
   QAComment,
   CreateCommentInput,
+  ImageListFilters,
+  ImageWorkflowEvent,
 } from "../types";
 
 const BASE = "/api/v1";
@@ -195,8 +197,17 @@ export async function uploadImage(
 
 export async function listImages(
   projectId: string,
+  filters: ImageListFilters,
 ): Promise<ListResponse<ImageMeta>> {
-  return request(`/projects/${projectId}/images`);
+  const searchParams = new URLSearchParams();
+  if (filters.status !== undefined) {
+    searchParams.set("status", filters.status);
+  }
+  if (filters.escalated !== undefined) {
+    searchParams.set("escalated", String(filters.escalated));
+  }
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
+  return request(`/projects/${projectId}/images${query}`);
 }
 
 export async function getImage(imageId: string): Promise<ImageMeta> {
@@ -216,6 +227,16 @@ export async function updateImageTransform(
   return request(`/images/${imageId}`, {
     method: "PATCH",
     ...json({ rotation, flip_h: flipH, flip_v: flipV }),
+  });
+}
+
+export async function applyImageWorkflowEvent(
+  imageId: string,
+  event: ImageWorkflowEvent,
+): Promise<ImageMeta> {
+  return request(`/images/${imageId}/workflow-transitions`, {
+    method: "POST",
+    ...json({ event }),
   });
 }
 

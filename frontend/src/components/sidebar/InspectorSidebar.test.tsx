@@ -6,6 +6,10 @@ import { useAnnotationStore } from "../../stores/annotationStore";
 import { useProjectStore } from "../../stores/projectStore";
 import InspectorSidebar from "./InspectorSidebar";
 
+vi.mock("./CommentPanel", () => ({
+  default: () => <button type="button">Add comment</button>,
+}));
+
 beforeEach(() => {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
     configurable: true,
@@ -40,6 +44,7 @@ it("keeps Canvas editing state while the Guidelines tab and inspector are toggle
       onSelectLabel={() => undefined}
       onSelectAnnotation={() => undefined}
       currentImageId="image-1"
+      graphEditable
     />,
   );
 
@@ -52,4 +57,27 @@ it("keeps Canvas editing state while the Guidelines tab and inspector are toggle
   expect(state.polygonDraftPoints).toEqual([{ x: 0.1, y: 0.2 }]);
   expect(state.dirty).toBe(true);
   expect(screen.getByRole("tab", { name: "Guidelines" }).getAttribute("aria-selected")).toBe("true");
+});
+
+it("keeps object inspection and Comments available while Graph editing is locked", async () => {
+  render(
+    <InspectorSidebar
+      labels={[]}
+      activeLabel={null}
+      onSelectLabel={() => undefined}
+      onSelectAnnotation={() => undefined}
+      currentImageId="image-1"
+      graphEditable={false}
+    />,
+  );
+
+  expect((screen.getByRole("button", {
+    name: "Delete No label annotation 1",
+  }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: /Select No label BBox/ })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("tab", { name: "Comments" }));
+  expect((await screen.findByRole("button", {
+    name: "Add comment",
+  }) as HTMLButtonElement).disabled).toBe(false);
 });

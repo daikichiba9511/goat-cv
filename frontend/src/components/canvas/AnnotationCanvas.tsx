@@ -20,9 +20,15 @@ type Props = {
   image: ImageMeta;
   activeTool: Tool;
   activeLabel: string | null;
+  graphEditable: boolean;
 };
 
-export default function AnnotationCanvas({ image, activeTool, activeLabel }: Props) {
+export default function AnnotationCanvas({
+  image,
+  activeTool,
+  activeLabel,
+  graphEditable,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -97,6 +103,14 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     return () => resizeObserver.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (graphEditable) return;
+    // Why: workflow lockへの切替時に作成途中の図形をCanvas上へ残さない。
+    drawingStartRef.current = null;
+    drawingRectRef.current?.visible(false);
+    drawingRectRef.current?.getLayer()?.batchDraw();
+  }, [graphEditable]);
+
   // Why: 初期表示は全体が見えるfitにし、手動Zoom/PanはStage変換として別に持つ。
   const scale = img && stageSize.width > 0
     ? Math.min(stageSize.width / image.width, stageSize.height / image.height)
@@ -111,7 +125,11 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     const selectedAnnotation = annotations.find(
       (annotation) => annotation.id === selectedId,
     );
-    if (selectedAnnotation?.type === "bbox" && activeTool === "select") {
+    if (
+      graphEditable
+      && selectedAnnotation?.type === "bbox"
+      && activeTool === "select"
+    ) {
       const node = stage.findOne(`#${CSS.escape(selectedAnnotation.id)}`);
       if (node) {
         transformer.nodes([node]);
@@ -121,7 +139,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     }
     transformer.nodes([]);
     transformer.getLayer()?.batchDraw();
-  }, [selectedId, activeTool, annotations]);
+  }, [selectedId, activeTool, annotations, graphEditable]);
 
   // Why: 保存座標は正規化値なので、Zoom/Pan後の画面座標を画像座標へ戻してから保存する。
   const screenToNormalized = useCallback(
@@ -172,7 +190,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   };
 
   const handleMouseDown = () => {
-    if (activeTool !== "bbox") return;
+    if (!graphEditable || activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
     const pos = stage.getPointerPosition();
@@ -195,7 +213,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   };
 
   const handleMouseMove = () => {
-    if (activeTool === "polygon") {
+    if (graphEditable && activeTool === "polygon") {
       const position = stageRef.current?.getPointerPosition();
       if (!position) return;
       const [x, y] = screenToNormalized(position.x, position.y);
@@ -205,7 +223,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     }
 
     const drawingStart = drawingStartRef.current;
-    if (!drawingStart || activeTool !== "bbox") return;
+    if (!graphEditable || !drawingStart || activeTool !== "bbox") return;
     const stage = stageRef.current;
     if (!stage) return;
     const pos = stage.getPointerPosition();
@@ -257,11 +275,11 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     if (activeTool === "select" && clickedCanvasBackground) {
       select(null);
     }
-    if (activeTool === "edge" && clickedCanvasBackground) {
+    if (graphEditable && activeTool === "edge" && clickedCanvasBackground) {
       cancelEdgeDraft();
       selectEdge(null);
     }
-    if (activeTool === "polygon" && clickedCanvasBackground) {
+    if (graphEditable && activeTool === "polygon" && clickedCanvasBackground) {
       const position = stageRef.current?.getPointerPosition();
       if (!position) return;
       const [x, y] = screenToNormalized(position.x, position.y);
@@ -285,7 +303,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
         return;
       }
 
-      if (activeTool === "polygon") {
+      if (graphEditable && activeTool === "polygon") {
         if (e.key === "Escape" && polygonDraftPoints.length > 0) {
           e.preventDefault();
           cancelPolygonDraft();
@@ -304,6 +322,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
       }
 
       if (e.key !== "Delete" && e.key !== "Backspace") return;
+      if (!graphEditable) return;
       if (selectedEdgeId) {
         removeEdge(selectedEdgeId);
         return;
@@ -317,6 +336,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
       activeTool,
       cancelPolygonDraft,
       finishPolygon,
+      graphEditable,
       image.id,
       polygonDraftPoints.length,
       remove,
@@ -333,7 +353,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   }, [handleKeyDown]);
 
   const handleAnnotationClick = useCallback((annotationId: string) => {
-    if (activeTool === "edge") {
+    if (graphEditable && activeTool === "edge") {
       connectEdge(image.id, annotationId, labels);
       return;
     }
@@ -341,6 +361,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   }, [
     activeTool,
     connectEdge,
+    graphEditable,
     image.id,
     labels,
     select,
@@ -368,7 +389,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
           }
         }}
         onMouseLeave={() => setPolygonCursor(null)}
-        style={{ cursor: activeTool === "bbox" || activeTool === "polygon" || activeTool === "edge" ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
+        style={{ cursor: graphEditable && (activeTool === "bbox" || activeTool === "polygon" || activeTool === "edge") ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
       >
         <Layer>
           {img && (
@@ -399,6 +420,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             scale={scale}
             stageScale={stageScale}
             compactLabels={stageSize.width < 480}
+            editable={graphEditable}
             onAnnotationClick={handleAnnotationClick}
             onEdgeClick={selectEdge}
             onBBoxCoordinatesChange={updateBBoxCoordinates}
@@ -422,7 +444,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             dash={[4, 4]}
             listening={false}
           />
-          {activeTool === "polygon" && (
+          {graphEditable && activeTool === "polygon" && (
             <PolygonDraftOverlay
               points={polygonDraftPoints}
               cursor={polygonCursor}

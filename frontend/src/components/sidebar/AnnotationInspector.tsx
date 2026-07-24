@@ -8,12 +8,17 @@ import { useAnnotationStore } from "../../stores/annotationStore";
 type Props = {
   labels: LabelDefinition[];
   onSelectAnnotation: (annotationId: string) => void;
+  graphEditable: boolean;
 };
 
 type ShapeFilter = "all" | Annotation["type"];
 
 // AnnotationInspector lists and filters the current image's annotations without changing graph data.
-export default function AnnotationInspector({ labels, onSelectAnnotation }: Props) {
+export default function AnnotationInspector({
+  labels,
+  onSelectAnnotation,
+  graphEditable,
+}: Props) {
   const {
     annotations,
     edges,
@@ -165,7 +170,8 @@ export default function AnnotationInspector({ labels, onSelectAnnotation }: Prop
                 aria-label={`Delete ${labelName} annotation ${annotationPosition}`}
                 title={`Delete ${labelName} annotation ${annotationPosition}`}
                 onClick={() => remove(annotation.id)}
-                className="flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600 focus:bg-red-50 focus:text-red-600"
+                disabled={!graphEditable}
+                className="flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600 focus:bg-red-50 focus:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
               >
                 <Trash2 aria-hidden="true" size={15} strokeWidth={1.75} />
               </button>

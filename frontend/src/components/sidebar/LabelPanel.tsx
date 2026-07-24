@@ -7,6 +7,7 @@ type Props = {
   labels: LabelDefinition[];
   activeLabel: string | null;
   onSelectLabel: (id: string | null) => void;
+  graphEditable: boolean;
 };
 
 const DEFAULT_COLORS = [
@@ -23,7 +24,12 @@ const CATEGORIES: { value: LabelCategory; label: string }[] = [
   { value: "cell", label: "Cell" },
 ];
 
-export default function LabelPanel({ labels, activeLabel, onSelectLabel }: Props) {
+export default function LabelPanel({
+  labels,
+  activeLabel,
+  onSelectLabel,
+  graphEditable,
+}: Props) {
   const { createLabel, updateLabel, deleteLabel } = useProjectStore();
   const { annotations, selectedId, setLabel } = useAnnotationStore();
   const [showForm, setShowForm] = useState(false);
@@ -143,6 +149,7 @@ export default function LabelPanel({ labels, activeLabel, onSelectLabel }: Props
           <select
             value={selectedAnnotationLabelValue}
             onChange={(e) => setLabel(selectedAnnotation.id, e.target.value || null)}
+            disabled={!graphEditable}
             className="w-full border rounded px-2 py-1.5 text-sm bg-white"
           >
             <option value="">No label</option>

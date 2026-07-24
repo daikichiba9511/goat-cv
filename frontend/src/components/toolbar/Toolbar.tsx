@@ -9,7 +9,7 @@ import {
   RotateCw,
   Save as SaveIcon,
 } from "lucide-react";
-import type { Tool } from "../../types";
+import type { ImageMeta, Tool } from "../../types";
 
 type Props = {
   activeTool: Tool;
@@ -19,19 +19,20 @@ type Props = {
   saving: boolean;
   saveError: string | null;
   projectName: string;
-  imageName: string | null;
-  hasImage: boolean;
+  image: ImageMeta | null;
+  graphEditable: boolean;
+  transformEditable: boolean;
   onRotate: () => void;
   onFlipH: () => void;
   onFlipV: () => void;
 };
 
-const tools: { key: Tool; label: string }[] = [
-  { key: "select", label: "Select" },
-  { key: "bbox", label: "BBox" },
-  { key: "polygon", label: "Polygon" },
-  { key: "edge", label: "Edge" },
-  { key: "pan", label: "Pan" },
+const tools: { key: Tool; label: string; changesGraph: boolean }[] = [
+  { key: "select", label: "Select", changesGraph: false },
+  { key: "bbox", label: "BBox", changesGraph: true },
+  { key: "polygon", label: "Polygon", changesGraph: true },
+  { key: "edge", label: "Edge", changesGraph: true },
+  { key: "pan", label: "Pan", changesGraph: false },
 ];
 
 export default function Toolbar({
@@ -42,14 +43,17 @@ export default function Toolbar({
   saving,
   saveError,
   projectName,
-  imageName,
-  hasImage,
+  image,
+  graphEditable,
+  transformEditable,
   onRotate,
   onFlipH,
   onFlipV,
 }: Props) {
   const navigate = useNavigate();
   const transformMenuRef = useRef<HTMLDetailsElement>(null);
+  const imageName = image?.filename ?? null;
+  const hasImage = image !== null;
   const imageContext = imageName ? `${projectName} / ${imageName}` : projectName;
   const runTransform = (transform: () => void) => {
     transform();
@@ -79,10 +83,16 @@ export default function Toolbar({
         aria-label="Annotation tool"
         value={activeTool}
         onChange={(event) => onToolChange(event.target.value as Tool)}
-        className="w-24 flex-shrink-0 rounded border bg-white px-2 py-1 text-sm lg:hidden"
+        className="hidden w-24 flex-shrink-0 rounded border bg-white px-2 py-1 text-sm sm:block lg:hidden"
       >
         {tools.map((tool) => (
-          <option key={tool.key} value={tool.key}>{tool.label}</option>
+          <option
+            key={tool.key}
+            value={tool.key}
+            disabled={!hasImage || (tool.changesGraph && !graphEditable)}
+          >
+            {tool.label}
+          </option>
         ))}
       </select>
 
@@ -91,11 +101,12 @@ export default function Toolbar({
           <button
             type="button"
             key={t.key}
+            disabled={!hasImage || (t.changesGraph && !graphEditable)}
             onClick={() => onToolChange(t.key)}
             className={`rounded px-2.5 py-1 text-sm ${
               activeTool === t.key
                 ? "bg-blue-600 text-white"
-                : "bg-gray-100 hover:bg-gray-200"
+                : "bg-gray-100 hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400"
             }`}
           >
             {t.label}
@@ -108,7 +119,8 @@ export default function Toolbar({
           <button
             type="button"
             onClick={onRotate}
-            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+            disabled={!transformEditable}
+            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400"
             aria-label="Rotate 90 degrees"
             title="Rotate 90 degrees"
           >
@@ -117,7 +129,8 @@ export default function Toolbar({
           <button
             type="button"
             onClick={onFlipH}
-            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+            disabled={!transformEditable}
+            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400"
             aria-label="Flip horizontally"
             title="Flip Horizontal"
           >
@@ -126,7 +139,8 @@ export default function Toolbar({
           <button
             type="button"
             onClick={onFlipV}
-            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+            disabled={!transformEditable}
+            className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:text-gray-400"
             aria-label="Flip vertically"
             title="Flip Vertical"
           >
@@ -148,7 +162,8 @@ export default function Toolbar({
             <button
               type="button"
               onClick={() => runTransform(onRotate)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              disabled={!transformEditable}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
             >
               <RotateCw aria-hidden="true" size={15} strokeWidth={1.75} />
               Rotate 90 degrees
@@ -156,7 +171,8 @@ export default function Toolbar({
             <button
               type="button"
               onClick={() => runTransform(onFlipH)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              disabled={!transformEditable}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
             >
               <FlipHorizontal2 aria-hidden="true" size={15} strokeWidth={1.75} />
               Flip horizontally
@@ -164,7 +180,8 @@ export default function Toolbar({
             <button
               type="button"
               onClick={() => runTransform(onFlipV)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
+              disabled={!transformEditable}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
             >
               <FlipVertical2 aria-hidden="true" size={15} strokeWidth={1.75} />
               Flip vertically
@@ -192,9 +209,9 @@ export default function Toolbar({
       <button
         type="button"
         onClick={onSave}
-        disabled={!dirty || saving}
+        disabled={!dirty || saving || !graphEditable}
         className={`hidden min-w-16 flex-shrink-0 rounded px-3 py-1 text-sm sm:block ${
-          dirty && !saving
+          dirty && !saving && graphEditable
             ? "bg-green-600 text-white hover:bg-green-700"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
@@ -206,9 +223,9 @@ export default function Toolbar({
         aria-label={saving ? "Saving" : "Save"}
         title={saving ? "Saving" : "Save"}
         onClick={onSave}
-        disabled={!dirty || saving}
+        disabled={!dirty || saving || !graphEditable}
         className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded sm:hidden ${
-          dirty && !saving
+          dirty && !saving && graphEditable
             ? "bg-green-600 text-white hover:bg-green-700"
             : "cursor-not-allowed bg-gray-100 text-gray-400"
         }`}

@@ -3,6 +3,7 @@ import type {
   Project,
   LabelDefinition,
   ImageMeta,
+  ImageListFilters,
   LabelCategory,
   Guideline,
 } from "../types";
@@ -14,6 +15,7 @@ type ProjectStore = {
   labels: LabelDefinition[];
   guidelines: Guideline[];
   images: ImageMeta[];
+  imageFilters: ImageListFilters;
 
   fetchProjects: () => Promise<void>;
   selectProject: (id: string) => Promise<void>;
@@ -49,6 +51,8 @@ type ProjectStore = {
   deleteGuideline: (id: string) => Promise<void>;
 
   fetchImages: () => Promise<void>;
+  setImageFilters: (filters: ImageListFilters) => Promise<void>;
+  replaceImage: (image: ImageMeta) => void;
   uploadImage: (file: File) => Promise<void>;
   deleteImage: (id: string) => Promise<void>;
 };
@@ -59,6 +63,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   labels: [],
   guidelines: [],
   images: [],
+  imageFilters: {},
 
   fetchProjects: async () => {
     const res = await api.listProjects();
@@ -67,7 +72,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   selectProject: async (id) => {
     const project = await api.getProject(id);
-    set({ currentProject: project });
+    set({ currentProject: project, imageFilters: {} });
     await Promise.all([
       get().fetchLabels(),
       get().fetchGuidelines(),
@@ -150,8 +155,27 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   fetchImages: async () => {
     const project = get().currentProject;
     if (!project) return;
-    const res = await api.listImages(project.id);
+    const filters = get().imageFilters;
+    const res = await api.listImages(project.id, filters);
+    // Why: 先に送ったfilter requestが後着しても、現在の一覧を古い条件へ戻さない。
+    if (
+      get().currentProject?.id !== project.id
+      || get().imageFilters !== filters
+    ) {
+      return;
+    }
     set({ images: res.items });
+  },
+
+  setImageFilters: async (filters) => {
+    set({ imageFilters: filters });
+    await get().fetchImages();
+  },
+
+  replaceImage: (image) => {
+    set((state) => ({
+      images: state.images.map((item) => item.id === image.id ? image : item),
+    }));
   },
 
   uploadImage: async (file) => {

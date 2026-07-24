@@ -47,7 +47,7 @@ type AnnotationStore = {
   ) => void;
   remove: (id: string) => void;
   removeEdge: (id: string) => void;
-  save: (imageId: string) => Promise<void>;
+  save: (imageId: string) => Promise<boolean>;
   clear: () => void;
 };
 
@@ -444,7 +444,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   },
 
   save: async (imageId) => {
-    if (get().saving) return;
+    if (get().saving) return false;
 
     const {
       annotations,
@@ -477,12 +477,12 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       const savedGraph = await api.saveImageGraph(imageId, graph);
       // Why: 画像切替後に届いた旧画像の保存結果を、現在表示中のグラフへ適用しない。
       if (get().loadedImageId !== loadedImageId) {
-        return;
+        return false;
       }
       if (get().revision !== revision) {
         // Why: 保存開始後の編集を古いレスポンスで上書きせず、次の保存対象としてローカルに残す。
         set({ saving: false, saveError: null });
-        return;
+        return false;
       }
       const savedAnnotationByClientID = new Map(
         savedGraph.annotations.map((item) => [item.client_id, item.annotation]),
@@ -516,15 +516,17 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         saving: false,
         saveError: null,
       });
+      return true;
     } catch (error) {
       if (get().loadedImageId !== loadedImageId) {
-        return;
+        return false;
       }
       set({
         dirty: true,
         saving: false,
         saveError: error instanceof Error ? error.message : String(error),
       });
+      return false;
     }
   },
 
