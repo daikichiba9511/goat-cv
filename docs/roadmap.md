@@ -21,12 +21,12 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 1 | Add product specification and roadmap | [PR #2](https://github.com/daikichiba9511/goat-cv/pull/2), [PR #3](https://github.com/daikichiba9511/goat-cv/pull/3) | Defined the product scope, clarified the general CV focus, and established the PR-level roadmap |
 | 2 | Add edge API validation | [PR #5](https://github.com/daikichiba9511/goat-cv/pull/5), [PR #8](https://github.com/daikichiba9511/goat-cv/pull/8) | Added Edge APIs and validation for cross-image, duplicate, self-referential, and cyclic reading-order edges |
 | 3 | Add edge annotation UI | [PR #6](https://github.com/daikichiba9511/goat-cv/pull/6), [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7), [PR #8](https://github.com/daikichiba9511/goat-cv/pull/8) | Added label-aware BBox presentation and Reading Order edge drawing, display, save, reload, and deletion |
+| 4 | Validate annotation coordinates | [PR #22](https://github.com/daikichiba9511/goat-cv/pull/22) | Added atomic API validation for normalized Bounding Box and Polygon coordinate schemas |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 4 | Validate annotation coordinates | [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) | Atomic API validation for normalized Bounding Box and Polygon coordinates |
 | 5 | Save the image graph atomically | [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) | One transactional save contract for Annotations and Edges with explicit client ID mapping |
 | 6 | Add annotation inspector | [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) | Synchronized list and Canvas selection for annotations, labels, and relationships |
 | 7 | Add remaining edge relation UI | [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) | UI support for `key_value` and `table_cell` Edges without regressing `reading_order` |
@@ -43,7 +43,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 
 ## Dependency Order
 
-- [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) precedes [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13), so the atomic graph endpoint can reuse one annotation validation boundary.
+- Completed [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) provides the annotation validation boundary used by [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13).
 - [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) is independent of the save-contract changes and follows the backend foundation work to improve object and label inspection before the remaining drawing tools are added.
 - [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) precedes [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12), so new Edge and Polygon workflows do not extend the current two-request save path.
 - Issues [#15](https://github.com/daikichiba9511/goat-cv/issues/15), [#18](https://github.com/daikichiba9511/goat-cv/issues/18), and [#19](https://github.com/daikichiba9511/goat-cv/issues/19) are decision work. Each creates smaller implementation issues only after its behavior or architecture is explicit.
@@ -76,7 +76,7 @@ Work items:
 
 - Completed: Edge API validation in [PR #5](https://github.com/daikichiba9511/goat-cv/pull/5)
 - Completed: Reading Order edge UI in [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7)
-- [Issue #11: Validate annotation coordinates](https://github.com/daikichiba9511/goat-cv/issues/11)
+- Completed: Annotation coordinate validation in [PR #22](https://github.com/daikichiba9511/goat-cv/pull/22)
 - [Issue #13: Save the image graph atomically](https://github.com/daikichiba9511/goat-cv/issues/13)
 - [Issue #9: Add annotation inspector](https://github.com/daikichiba9511/goat-cv/issues/9)
 - [Issue #10: Add remaining edge relation UI](https://github.com/daikichiba9511/goat-cv/issues/10)
@@ -160,6 +160,7 @@ Completion criteria:
 - Link the tracking issue and close it only when its acceptance criteria are met
 - Add or update tests for backend validation and export behavior
 - Run `cd backend && go test ./...`
+- Run `cd frontend && npm test`
 - Run `cd frontend && npm run build`
 - Keep PRs draft until the checks and manual smoke path are described
 

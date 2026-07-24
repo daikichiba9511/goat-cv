@@ -6,6 +6,8 @@ import type {
   Edge,
   ListResponse,
   LabelCategory,
+  ImageGraphSaveRequest,
+  ImageGraphSaveResponse,
 } from "../types";
 
 const BASE = "/api/v1";
@@ -158,16 +160,6 @@ export async function listAnnotations(
   return request(`/images/${imageId}/annotations`);
 }
 
-export async function bulkReplaceAnnotations(
-  imageId: string,
-  annotations: Omit<Annotation, "image_id" | "created_at">[],
-): Promise<ListResponse<Annotation>> {
-  return request(`/images/${imageId}/annotations`, {
-    method: "PUT",
-    ...json({ annotations }),
-  });
-}
-
 export async function updateAnnotation(
   annotationId: string,
   type: "bbox" | "polygon",
@@ -190,12 +182,13 @@ export async function listEdges(imageId: string): Promise<ListResponse<Edge>> {
   return request(`/images/${imageId}/edges`);
 }
 
-export async function bulkReplaceEdges(
+// saveImageGraph atomically replaces all annotations and edges for one image.
+export async function saveImageGraph(
   imageId: string,
-  edges: Omit<Edge, "image_id">[],
-): Promise<ListResponse<Edge>> {
-  return request(`/images/${imageId}/edges`, {
+  graph: ImageGraphSaveRequest,
+): Promise<ImageGraphSaveResponse> {
+  return request(`/images/${imageId}/graph`, {
     method: "PUT",
-    ...json({ edges }),
+    ...json(graph),
   });
 }

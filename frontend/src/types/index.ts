@@ -75,6 +75,32 @@ export type Edge = {
   type: EdgeType;
 };
 
+export type ImageGraphAnnotationInput = {
+  client_id: string;
+  id: string;
+  type: Annotation["type"];
+  coordinates: Annotation["coordinates"];
+  label_id: string | null;
+};
+
+export type ImageGraphEdgeInput = {
+  client_id: string;
+  id: string;
+  source_annotation_client_id: string;
+  target_annotation_client_id: string;
+  type: EdgeType;
+};
+
+export type ImageGraphSaveRequest = {
+  annotations: ImageGraphAnnotationInput[];
+  edges: ImageGraphEdgeInput[];
+};
+
+export type ImageGraphSaveResponse = {
+  annotations: { client_id: string; annotation: Annotation }[];
+  edges: { client_id: string; edge: Edge }[];
+};
+
 export type ListResponse<T> = {
   items: T[];
 };

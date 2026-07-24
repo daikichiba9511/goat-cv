@@ -61,7 +61,8 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - Polygon Annotation を作成、選択、編集、削除できる
 - Annotation は正規化座標で保存する
 - Zoom/Pan は表示操作であり、保存座標には影響しない
-- 一括保存により、Image 単位の Annotation を置き換えられる
+- 一括保存により、Image 単位の Annotation と Edge を1回の操作で置き換えられる
+- 保存に失敗した場合、編集中の Annotation と Edge を保持し、理由を表示して再試行できる
 
 ### Graph Annotation
 
@@ -107,7 +108,7 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 | Category | Requirement |
 |----------|-------------|
 | Usability | Annotator は Canvas から視線を大きく外さずにラベル選択、保存、画像切替を行える |
-| Data integrity | Annotation と Edge は Image 単位で整合する。不正な Edge は保存時に拒否する |
+| Data integrity | Annotation と Edge は Image 単位の1 Transactionで保存する。検証またはDB処理に失敗した場合は両方を変更しない |
 | Portability | Phase 1-4 はローカル開発環境で起動できる |
 | Performance | 1画像あたり数百 Annotation までは操作が破綻しない |
 | Extensibility | Repository、Usecase、Handler の層を分け、SQLite から PostgreSQL へ移行できる余地を残す |

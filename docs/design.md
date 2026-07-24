@@ -223,6 +223,35 @@ Polygon の自己交差判定は初期の座標検証に含めない。
 - 複数の値が1領域に収まっている場合（例: "担当者: 山田, 田中"）は Value BBox を1つにする
 - 物理的に離れた複数値は、同じ label の別 KV ペアとして扱う
 
+### Atomic Image Graph Save
+
+Annotator UIはImage内のAnnotationとEdgeを1つのGraphとして送信する。
+各Resourceはrequest-localな`client_id`を持ち、Edge端点もAnnotationの`client_id`を参照する。
+Usecaseは`client_id`を永続IDへ解決して候補Graph全体を検証し、Repositoryは削除・Annotation挿入・Edge挿入を1つのDB Transactionで実行する。
+Responseの配列順は対応付けに使用せず、各Resourceとともに返る`client_id`でFrontend stateを更新する。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Clean
+    Clean --> Dirty : edit / increment_revision
+    Dirty --> Dirty : edit / increment_revision
+    Dirty --> Saving : save / capture_revision
+    Saving --> Saving : edit / increment_revision
+    Saving --> Clean : save_succeeded [revision_unchanged] / apply_id_mapping
+    Saving --> Dirty : save_succeeded [revision_changed] / keep_local_graph
+    Saving --> Dirty : save_failed / show_error
+    Dirty --> Saving : retry / capture_revision
+```
+
+設計メモ:
+
+- `save`は`Saving`中に再実行せず、ToolbarのSave操作を無効にする
+- `revision_unchanged`は保存開始時の編集Revisionと現在値が等しい場合、`revision_changed`は異なる場合とする
+- `increment_revision`は編集ごとの累積操作であり、保存開始後の編集を古いResponseで上書きしないために使う
+- `save_failed`ではローカルGraphと`Dirty`を保持し、同じ保存操作を再試行できる
+- 未定義イベントは状態を変更しない。broadcastするイベントはない
+- Polygon自己交差、複数Image Transaction、共同編集の競合解決はこの保存状態に含めない
+
 ### Task-to-Model Mapping
 
 | Task | Annotationの使い方 | Edgeの使い方 | Label category |
