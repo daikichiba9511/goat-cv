@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0007](0007-pre-label-import-boundary.md)
 
 ## Context
 
@@ -40,7 +40,8 @@ ProviderにはBackendがtransformを適用した画像binaryを渡し、BBoxとP
 Candidateは利用者が採用するまでAnnotationにせず、採用、修正、破棄をImage Graph保存と同じTransactionで確定する。
 再実行が成功した場合は新しいRunだけを操作対象にするが、以前に採用したAnnotationとRun履歴は残す。
 
-詳細なSchemaと状態遷移は[Pre-Inference Integration Specification](../pre-inference.md)を正本とする。
+当時の詳細なSchemaと状態遷移は[PR #46](https://github.com/daikichiba9511/goat-cv/pull/46)の履歴に残す。
+現在の正本にはこのADRではなく[ADR-0007](0007-pre-label-import-boundary.md)を使用する。
 
 ## Rationale
 
