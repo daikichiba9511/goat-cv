@@ -34,12 +34,12 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 11 | Verify the workflow HTTP contract | [PR #40](https://github.com/daikichiba9511/goat-cv/pull/40) | Added production-router integration scenarios for approval, revision, escalation, errors, guards, Comments, and combined filters |
 | 12 | Add guideline management | [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30) | Added Project-scoped Guideline CRUD and safe Markdown viewing without losing Canvas editing state |
 | 13 | Add QA comments | [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31) | Added Image/Annotation QA Comments with selected-object filtering, resolved state, and retained audit history |
+| 14 | Design pre-inference integration | [PR #46](https://github.com/daikichiba9511/goat-cv/pull/46) | Defined the provider-neutral contract, persisted candidate lifecycle, atomic decision boundary, and implementation split |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 14 | Design pre-inference integration | [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Provider-independent API contract and candidate lifecycle decision |
 | 15 | Persist pre-inference state | [Issue #41](https://github.com/daikichiba9511/goat-cv/issues/41) | Inference Run, Candidate, and Label Mapping persistence |
 | 15 | Add provider-neutral run API | [Issue #42](https://github.com/daikichiba9511/goat-cv/issues/42) | Transformed-image inference, idempotency, failure classification, and public API |
 | 15 | Save candidate decisions atomically | [Issue #43](https://github.com/daikichiba9511/goat-cv/issues/43) | Candidate decisions committed with the Image Graph |
@@ -145,7 +145,7 @@ Goal: let model output accelerate manual annotation without making predictions a
 
 Work items:
 
-- [Issue #18: Design pre-inference integration](https://github.com/daikichiba9511/goat-cv/issues/18)
+- Completed: [Pre-Inference integration design](https://github.com/daikichiba9511/goat-cv/pull/46)
 - [Issue #41: Persist Inference Run, Candidate, and Label Mapping](https://github.com/daikichiba9511/goat-cv/issues/41)
 - [Issue #42: Add provider-neutral Inference Run API](https://github.com/daikichiba9511/goat-cv/issues/42)
 - [Issue #43: Save Candidate decisions with the Image Graph](https://github.com/daikichiba9511/goat-cv/issues/43)
