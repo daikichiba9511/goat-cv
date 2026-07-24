@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -18,9 +19,19 @@ type imageRepository interface {
 	Create(ctx context.Context, image domain.Image) (domain.Image, error)
 	Get(ctx context.Context, id string) (domain.Image, error)
 	ListByProject(ctx context.Context, projectID string) ([]domain.Image, error)
+	ListByProjectFiltered(ctx context.Context, projectID string, status *domain.ImageStatus, escalated *bool) ([]domain.Image, error)
 	UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool, width, height int) (domain.Image, error)
 	UpdateWorkflow(ctx context.Context, id string, status domain.ImageStatus, escalated bool) (domain.Image, error)
 	Delete(ctx context.Context, id string) error
+}
+
+// ErrInvalidImageStatus indicates a lifecycle status outside the workflow contract.
+var ErrInvalidImageStatus = errors.New("invalid image status")
+
+// ImageListFilter contains optional lifecycle and escalation filters combined with AND semantics.
+type ImageListFilter struct {
+	Status    *domain.ImageStatus
+	Escalated *bool
 }
 
 // ImageUsecase coordinates image file storage and image metadata operations.
@@ -85,6 +96,18 @@ func (u *ImageUsecase) ListByProject(ctx context.Context, projectID string) ([]d
 	return u.repo.ListByProject(ctx, projectID)
 }
 
+// ListByProjectFiltered returns Project Images matching all provided workflow filters.
+func (u *ImageUsecase) ListByProjectFiltered(
+	ctx context.Context,
+	projectID string,
+	filter ImageListFilter,
+) ([]domain.Image, error) {
+	if filter.Status != nil && !isKnownImageStatus(*filter.Status) {
+		return nil, fmt.Errorf("%w: %q", ErrInvalidImageStatus, *filter.Status)
+	}
+	return u.repo.ListByProjectFiltered(ctx, projectID, filter.Status, filter.Escalated)
+}
+
 // FilePath returns the local storage path for an image.
 // The path is derived from the image ID and original extension; callers should not persist this value.
 func (u *ImageUsecase) FilePath(img domain.Image) string {
@@ -97,6 +120,9 @@ func (u *ImageUsecase) FilePath(img domain.Image) string {
 func (u *ImageUsecase) UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool) (domain.Image, error) {
 	img, err := u.repo.Get(ctx, id)
 	if err != nil {
+		return domain.Image{}, err
+	}
+	if err := requireImageWorkflowOperation(img, ImageWorkflowOperationTransformEdit); err != nil {
 		return domain.Image{}, err
 	}
 	// Why: 回転・反転は画像ファイルを書き換えず、annotatorが見る座標空間のサイズだけを更新する。

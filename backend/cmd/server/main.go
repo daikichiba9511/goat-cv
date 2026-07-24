@@ -66,9 +66,9 @@ func main() {
 	guidelineUC := usecase.NewGuidelineUsecase(guidelineRepo)
 	commentUC := usecase.NewCommentUsecase(commentRepo, imageRepo, annotationRepo)
 	imageUC := usecase.NewImageUsecase(imageRepo, storagePath)
-	annotationUC := usecase.NewAnnotationUsecase(annotationRepo)
-	edgeUC := usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo)
-	imageGraphUC := usecase.NewImageGraphUsecase(imageGraphRepo, labelRepo)
+	annotationUC := usecase.NewAnnotationUsecase(annotationRepo, imageRepo)
+	edgeUC := usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo, imageRepo)
+	imageGraphUC := usecase.NewImageGraphUsecase(imageGraphRepo, labelRepo, imageRepo)
 	datasetExportUC := usecase.NewDatasetExportUsecase(
 		projectRepo,
 		imageRepo,

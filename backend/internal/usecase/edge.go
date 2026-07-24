@@ -29,6 +29,7 @@ var (
 
 type edgeRepository interface {
 	Create(ctx context.Context, edge domain.Edge) (domain.Edge, error)
+	Get(ctx context.Context, id string) (domain.Edge, error)
 	ListByImage(ctx context.Context, imageID string) ([]domain.Edge, error)
 	Delete(ctx context.Context, id string) error
 	BulkReplace(ctx context.Context, imageID string, edges []domain.Edge) ([]domain.Edge, error)
@@ -48,19 +49,34 @@ type EdgeUsecase struct {
 	edgeRepo       edgeRepository
 	annotationRepo edgeAnnotationRepository
 	labelRepo      edgeLabelRepository
+	workflowImages imageWorkflowReader
 }
 
 // NewEdgeUsecase creates an EdgeUsecase.
-func NewEdgeUsecase(edgeRepo edgeRepository, annotationRepo edgeAnnotationRepository, labelRepo edgeLabelRepository) *EdgeUsecase {
+func NewEdgeUsecase(
+	edgeRepo edgeRepository,
+	annotationRepo edgeAnnotationRepository,
+	labelRepo edgeLabelRepository,
+	workflowImages imageWorkflowReader,
+) *EdgeUsecase {
 	return &EdgeUsecase{
 		edgeRepo:       edgeRepo,
 		annotationRepo: annotationRepo,
 		labelRepo:      labelRepo,
+		workflowImages: workflowImages,
 	}
 }
 
 // Create creates a validated edge for an image.
 func (u *EdgeUsecase) Create(ctx context.Context, imageID, sourceAnnotationID, targetAnnotationID string, edgeType domain.EdgeType) (domain.Edge, error) {
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		imageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return domain.Edge{}, err
+	}
 	edge := domain.Edge{
 		ID:                 uuid.Must(uuid.NewV7()).String(),
 		ImageID:            imageID,
@@ -88,12 +104,33 @@ func (u *EdgeUsecase) ListByImage(ctx context.Context, imageID string) ([]domain
 
 // Delete removes an edge by ID.
 func (u *EdgeUsecase) Delete(ctx context.Context, id string) error {
+	// Why: item routeにはImage IDがないため、永続化済みEdgeの所有Imageを認可判定の正とする。
+	existingEdge, err := u.edgeRepo.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		existingEdge.ImageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return err
+	}
 	return u.edgeRepo.Delete(ctx, id)
 }
 
 // BulkReplace validates and replaces all edges for an image.
 // Edges with an empty ID are treated as new records and receive UUID v7 IDs.
 func (u *EdgeUsecase) BulkReplace(ctx context.Context, imageID string, edges []domain.Edge) ([]domain.Edge, error) {
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		imageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return nil, err
+	}
 	// Why: Edge編集UIは画像単位のグラフ全体を保存するため、永続化前に候補グラフ全体を検証する。
 	// Why not: 不正な候補が混じる場合に既存グラフを一度消すと、ユーザーの作業状態を壊してしまう。
 	candidateEdges := make([]domain.Edge, len(edges))

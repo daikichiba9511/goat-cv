@@ -9,8 +9,12 @@ SELECT * FROM images WHERE id = ?;
 -- name: ListImagesByProject :many
 SELECT * FROM images WHERE project_id = ? ORDER BY uploaded_at DESC;
 
--- name: ListImagesByProjectAndStatus :many
-SELECT * FROM images WHERE project_id = ? AND status = ? ORDER BY uploaded_at DESC;
+-- name: ListImagesByProjectFiltered :many
+SELECT * FROM images
+WHERE project_id = sqlc.arg(project_id)
+  AND (sqlc.narg(status) IS NULL OR status = sqlc.narg(status))
+  AND (sqlc.narg(escalated) IS NULL OR escalated = sqlc.narg(escalated))
+ORDER BY uploaded_at DESC;
 
 -- name: UpdateImageTransform :one
 UPDATE images SET

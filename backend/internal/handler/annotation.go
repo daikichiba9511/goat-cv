@@ -150,7 +150,7 @@ func (h *AnnotationHandler) update(w http.ResponseWriter, r *http.Request) {
 func (h *AnnotationHandler) delete(w http.ResponseWriter, r *http.Request) {
 	annID := chi.URLParam(r, "annotationId")
 	if err := h.uc.Delete(r.Context(), annID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeAnnotationError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -158,6 +158,9 @@ func (h *AnnotationHandler) delete(w http.ResponseWriter, r *http.Request) {
 
 // writeAnnotationError maps annotation usecase errors to their HTTP responses.
 func writeAnnotationError(w http.ResponseWriter, err error) {
+	if writeWorkflowOperationError(w, err) {
+		return
+	}
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		writeError(w, http.StatusNotFound, "annotation not found")

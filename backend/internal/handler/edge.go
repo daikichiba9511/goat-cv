@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 
@@ -129,15 +130,18 @@ func (h *EdgeHandler) bulkReplace(w http.ResponseWriter, r *http.Request) {
 func (h *EdgeHandler) delete(w http.ResponseWriter, r *http.Request) {
 	edgeID := chi.URLParam(r, "edgeId")
 	if err := h.uc.Delete(r.Context(), edgeID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeEdgeError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeEdgeError(w http.ResponseWriter, err error) {
+	if writeWorkflowOperationError(w, err) {
+		return
+	}
 	switch {
-	case errors.Is(err, usecase.ErrEdgeAnnotationNotFound):
+	case errors.Is(err, sql.ErrNoRows), errors.Is(err, usecase.ErrEdgeAnnotationNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, usecase.ErrDuplicateEdge),
 		errors.Is(err, usecase.ErrReadingOrderCycle),

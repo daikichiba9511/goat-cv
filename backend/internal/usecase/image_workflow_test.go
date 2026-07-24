@@ -176,11 +176,69 @@ func TestAllowedImageWorkflowEventsMatchPublishedStateMachine(t *testing.T) {
 	}
 }
 
+func TestImageTransformRequiresPendingWorkflowWithoutEscalation(t *testing.T) {
+	tests := []struct {
+		name         string
+		image        domain.Image
+		wantConflict bool
+	}{
+		{
+			name:  "pending",
+			image: domain.Image{ID: workflowImageID, OriginalWidth: 100, OriginalHeight: 200, Status: domain.ImageStatusPending},
+		},
+		{
+			name:         "rejected",
+			image:        domain.Image{ID: workflowImageID, OriginalWidth: 100, OriginalHeight: 200, Status: domain.ImageStatusRejected},
+			wantConflict: true,
+		},
+		{
+			name:         "escalated pending",
+			image:        domain.Image{ID: workflowImageID, OriginalWidth: 100, OriginalHeight: 200, Status: domain.ImageStatusPending, Escalated: true},
+			wantConflict: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := &workflowImageRepository{image: test.image}
+			imageUsecase := usecase.NewImageUsecase(repository, "")
+
+			_, err := imageUsecase.UpdateTransform(
+				context.Background(),
+				workflowImageID,
+				domain.Rotation90,
+				false,
+				false,
+			)
+			if test.wantConflict {
+				var conflictError *usecase.ImageWorkflowOperationConflictError
+				if !errors.As(err, &conflictError) {
+					t.Fatalf("UpdateTransform error = %v, want ImageWorkflowOperationConflictError", err)
+				}
+				if conflictError.Operation != usecase.ImageWorkflowOperationTransformEdit {
+					t.Fatalf("conflict operation = %q, want transform edit", conflictError.Operation)
+				}
+				if repository.transformUpdateCount != 0 {
+					t.Fatalf("transform updates = %d, want 0", repository.transformUpdateCount)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("UpdateTransform returned error: %v", err)
+			}
+			if repository.transformUpdateCount != 1 {
+				t.Fatalf("transform updates = %d, want 1", repository.transformUpdateCount)
+			}
+		})
+	}
+}
+
 const workflowImageID = "workflow-image"
 
 type workflowImageRepository struct {
-	image       domain.Image
-	updateCount int
+	image                domain.Image
+	updateCount          int
+	transformUpdateCount int
 }
 
 func (repository *workflowImageRepository) Create(_ context.Context, image domain.Image) (domain.Image, error) {
@@ -199,6 +257,15 @@ func (repository *workflowImageRepository) ListByProject(_ context.Context, _ st
 	return []domain.Image{repository.image}, nil
 }
 
+func (repository *workflowImageRepository) ListByProjectFiltered(
+	_ context.Context,
+	_ string,
+	_ *domain.ImageStatus,
+	_ *bool,
+) ([]domain.Image, error) {
+	return []domain.Image{repository.image}, nil
+}
+
 func (repository *workflowImageRepository) UpdateTransform(
 	_ context.Context,
 	_ string,
@@ -208,6 +275,7 @@ func (repository *workflowImageRepository) UpdateTransform(
 	width int,
 	height int,
 ) (domain.Image, error) {
+	repository.transformUpdateCount++
 	repository.image.Rotation = rotation
 	repository.image.FlipH = flipH
 	repository.image.FlipV = flipV

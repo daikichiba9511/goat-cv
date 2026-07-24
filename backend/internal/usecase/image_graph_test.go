@@ -218,6 +218,56 @@ func TestImageGraphUsecaseSaveRollsBackAnnotationsAndEdgesWhenEdgeInsertFails(t 
 	}
 }
 
+func TestImageGraphUsecaseSaveRejectsLockedWorkflowWithoutChangingGraph(t *testing.T) {
+	fixture := newImageGraphFixture(t)
+	execSQL(
+		t,
+		fixture.ctx,
+		fixture.db,
+		`UPDATE images SET status = ?, escalated = 1 WHERE id = ?`,
+		domain.ImageStatusPending,
+		testImageID,
+	)
+
+	_, err := fixture.usecase.Save(fixture.ctx, testImageID, usecase.ImageGraphInput{
+		Annotations: []usecase.ImageGraphAnnotationInput{validGraphAnnotationInput("replacement", 0)},
+	})
+	var conflictError *usecase.ImageWorkflowOperationConflictError
+	if !errors.As(err, &conflictError) {
+		t.Fatalf("Save error = %v, want ImageWorkflowOperationConflictError", err)
+	}
+	if conflictError.Operation != usecase.ImageWorkflowOperationGraphEdit {
+		t.Fatalf("conflict operation = %q, want graph edit", conflictError.Operation)
+	}
+
+	annotations, listError := fixture.annotationRepository.ListByImage(fixture.ctx, testImageID)
+	if listError != nil {
+		t.Fatalf("List annotations after rejected Save: %v", listError)
+	}
+	if len(annotations) != 9 {
+		t.Fatalf("annotations after rejected Save = %d, want original 9", len(annotations))
+	}
+}
+
+func TestImageGraphUsecaseSaveAllowsRejectedRevision(t *testing.T) {
+	fixture := newImageGraphFixture(t)
+	execSQL(
+		t,
+		fixture.ctx,
+		fixture.db,
+		`UPDATE images SET status = ? WHERE id = ?`,
+		domain.ImageStatusRejected,
+		testImageID,
+	)
+
+	_, err := fixture.usecase.Save(fixture.ctx, testImageID, usecase.ImageGraphInput{
+		Annotations: []usecase.ImageGraphAnnotationInput{validGraphAnnotationInput("revision", 0)},
+	})
+	if err != nil {
+		t.Fatalf("Save rejected revision returned error: %v", err)
+	}
+}
+
 type imageGraphFixture struct {
 	ctx                  context.Context
 	db                   *sql.DB
@@ -236,11 +286,16 @@ func newImageGraphFixture(t testing.TB) imageGraphFixture {
 	edgeRepository := sqlite.NewEdgeRepository(edgeFixture.db, queries)
 	labelRepository := sqlite.NewLabelRepository(queries)
 	graphRepository := sqlite.NewImageGraphRepository(edgeFixture.db, queries)
+	imageRepository := sqlite.NewImageRepository(queries)
 
 	return imageGraphFixture{
-		ctx:                  edgeFixture.ctx,
-		db:                   edgeFixture.db,
-		usecase:              usecase.NewImageGraphUsecase(reorderingImageGraphRepository{repository: graphRepository}, labelRepository),
+		ctx: edgeFixture.ctx,
+		db:  edgeFixture.db,
+		usecase: usecase.NewImageGraphUsecase(
+			reorderingImageGraphRepository{repository: graphRepository},
+			labelRepository,
+			imageRepository,
+		),
 		edgeUsecase:          edgeFixture.usecase,
 		annotationRepository: annotationRepository,
 		edgeRepository:       edgeRepository,

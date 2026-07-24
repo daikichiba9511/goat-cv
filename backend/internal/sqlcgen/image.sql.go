@@ -135,17 +135,22 @@ func (q *Queries) ListImagesByProject(ctx context.Context, projectID string) ([]
 	return items, nil
 }
 
-const listImagesByProjectAndStatus = `-- name: ListImagesByProjectAndStatus :many
-SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated FROM images WHERE project_id = ? AND status = ? ORDER BY uploaded_at DESC
+const listImagesByProjectFiltered = `-- name: ListImagesByProjectFiltered :many
+SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated FROM images
+WHERE project_id = ?1
+  AND (?2 IS NULL OR status = ?2)
+  AND (?3 IS NULL OR escalated = ?3)
+ORDER BY uploaded_at DESC
 `
 
-type ListImagesByProjectAndStatusParams struct {
+type ListImagesByProjectFilteredParams struct {
 	ProjectID string
-	Status    string
+	Status    interface{}
+	Escalated interface{}
 }
 
-func (q *Queries) ListImagesByProjectAndStatus(ctx context.Context, arg ListImagesByProjectAndStatusParams) ([]Image, error) {
-	rows, err := q.db.QueryContext(ctx, listImagesByProjectAndStatus, arg.ProjectID, arg.Status)
+func (q *Queries) ListImagesByProjectFiltered(ctx context.Context, arg ListImagesByProjectFilteredParams) ([]Image, error) {
+	rows, err := q.db.QueryContext(ctx, listImagesByProjectFiltered, arg.ProjectID, arg.Status, arg.Escalated)
 	if err != nil {
 		return nil, err
 	}

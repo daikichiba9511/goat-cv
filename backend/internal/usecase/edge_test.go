@@ -160,6 +160,41 @@ func TestEdgeUsecaseBulkReplaceRejectsInvalidSetWithoutChangingExistingEdges(t *
 	}
 }
 
+func TestEdgeUsecaseDeleteRejectsLockedImageWithoutChangingEdges(t *testing.T) {
+	fixture := newEdgeFixture(t)
+	edge, err := fixture.usecase.Create(
+		fixture.ctx,
+		testImageID,
+		"ann-a",
+		"ann-b",
+		domain.EdgeTypeReadingOrder,
+	)
+	if err != nil {
+		t.Fatalf("Create Edge: %v", err)
+	}
+	execSQL(
+		t,
+		fixture.ctx,
+		fixture.db,
+		`UPDATE images SET status = ? WHERE id = ?`,
+		domain.ImageStatusApproved,
+		testImageID,
+	)
+
+	err = fixture.usecase.Delete(fixture.ctx, edge.ID)
+	var conflictError *usecase.ImageWorkflowOperationConflictError
+	if !errors.As(err, &conflictError) {
+		t.Fatalf("Delete error = %v, want ImageWorkflowOperationConflictError", err)
+	}
+	edges, listError := fixture.usecase.ListByImage(fixture.ctx, testImageID)
+	if listError != nil {
+		t.Fatalf("ListByImage after rejected Delete: %v", listError)
+	}
+	if len(edges) != 1 || edges[0].ID != edge.ID {
+		t.Fatalf("Edges after rejected Delete = %+v, want original Edge", edges)
+	}
+}
+
 type edgeFixture struct {
 	ctx     context.Context
 	db      *sql.DB
@@ -181,12 +216,17 @@ func newEdgeFixture(t testing.TB) edgeFixture {
 		}
 	})
 
-	migration, err := os.ReadFile("../../db/migrations/001_init.sql")
-	if err != nil {
-		t.Fatalf("read migration: %v", err)
-	}
-	if _, err := db.Exec(string(migration)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, migrationPath := range []string{
+		"../../db/migrations/001_init.sql",
+		"../../db/migrations/004_image_workflow.sql",
+	} {
+		migration, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", migrationPath, err)
+		}
+		if _, err := db.Exec(string(migration)); err != nil {
+			t.Fatalf("apply migration %s: %v", migrationPath, err)
+		}
 	}
 
 	ctx := context.Background()
@@ -196,11 +236,12 @@ func newEdgeFixture(t testing.TB) edgeFixture {
 	annotationRepo := sqlite.NewAnnotationRepository(db, queries)
 	labelRepo := sqlite.NewLabelRepository(queries)
 	edgeRepo := sqlite.NewEdgeRepository(db, queries)
+	imageRepo := sqlite.NewImageRepository(queries)
 
 	return edgeFixture{
 		ctx:     ctx,
 		db:      db,
-		usecase: usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo),
+		usecase: usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo, imageRepo),
 	}
 }
 

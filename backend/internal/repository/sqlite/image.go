@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
 	"github.com/daikichiba9511/goat-cv/backend/internal/sqlcgen"
@@ -59,18 +60,33 @@ func (r *ImageRepository) ListByProject(ctx context.Context, projectID string) (
 	return images, nil
 }
 
-// ListByProjectAndStatus returns images for a project filtered by status.
-func (r *ImageRepository) ListByProjectAndStatus(ctx context.Context, projectID string, status domain.ImageStatus) ([]domain.Image, error) {
-	rows, err := r.queries.ListImagesByProjectAndStatus(ctx, sqlcgen.ListImagesByProjectAndStatusParams{
+// ListByProjectFiltered returns images matching all provided workflow filters.
+func (r *ImageRepository) ListByProjectFiltered(
+	ctx context.Context,
+	projectID string,
+	status *domain.ImageStatus,
+	escalated *bool,
+) ([]domain.Image, error) {
+	statusFilter := sql.NullString{}
+	if status != nil {
+		statusFilter = sql.NullString{String: string(*status), Valid: true}
+	}
+	escalationFilter := sql.NullBool{}
+	if escalated != nil {
+		escalationFilter = sql.NullBool{Bool: *escalated, Valid: true}
+	}
+
+	rows, err := r.queries.ListImagesByProjectFiltered(ctx, sqlcgen.ListImagesByProjectFilteredParams{
 		ProjectID: projectID,
-		Status:    string(status),
+		Status:    statusFilter,
+		Escalated: escalationFilter,
 	})
 	if err != nil {
 		return nil, err
 	}
 	images := make([]domain.Image, len(rows))
-	for i, row := range rows {
-		images[i] = toImage(row)
+	for imageIndex, row := range rows {
+		images[imageIndex] = toImage(row)
 	}
 	return images, nil
 }

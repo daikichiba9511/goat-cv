@@ -157,6 +157,30 @@ func TestAnnotationCommentFollowsPersistentAnnotationIdentityAfterDeletion(t *te
 	}
 }
 
+func TestCommentUsecaseAllowsCommentWhileImageWorkflowIsLocked(t *testing.T) {
+	fixture := newCommentFixture(t)
+	if _, err := fixture.db.ExecContext(
+		fixture.ctx,
+		`UPDATE images SET status = ?, escalated = 1 WHERE id = ?`,
+		domain.ImageStatusInReview,
+		commentImageID,
+	); err != nil {
+		t.Fatalf("lock Image workflow: %v", err)
+	}
+
+	comment := fixture.create(
+		t,
+		commentImageID,
+		nil,
+		"reviewer",
+		"Need external judgment",
+		domain.CommentTypeQuestion,
+	)
+	if comment.ImageID != commentImageID || comment.Resolved {
+		t.Fatalf("Comment = %+v, want unresolved Comment on locked Image", comment)
+	}
+}
+
 const (
 	commentProjectID                = "comment-project-1"
 	otherCommentProjectID           = "comment-project-2"

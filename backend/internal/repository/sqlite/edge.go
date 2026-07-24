@@ -34,6 +34,15 @@ func (r *EdgeRepository) Create(ctx context.Context, edge domain.Edge) (domain.E
 	return toEdge(row), nil
 }
 
+// Get returns an edge by ID.
+func (r *EdgeRepository) Get(ctx context.Context, id string) (domain.Edge, error) {
+	row, err := r.queries.GetEdge(ctx, id)
+	if err != nil {
+		return domain.Edge{}, err
+	}
+	return toEdge(row), nil
+}
+
 // ListByImage returns edges for an image.
 func (r *EdgeRepository) ListByImage(ctx context.Context, imageID string) ([]domain.Edge, error) {
 	rows, err := r.queries.ListEdgesByImage(ctx, imageID)
