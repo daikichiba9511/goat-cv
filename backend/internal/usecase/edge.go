@@ -2,11 +2,9 @@ package usecase
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
-	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 
@@ -29,15 +27,31 @@ var (
 	ErrEdgeCardinalityViolation = errors.New("edge cardinality rule violation")
 )
 
+type edgeRepository interface {
+	Create(ctx context.Context, edge domain.Edge) (domain.Edge, error)
+	ListByImage(ctx context.Context, imageID string) ([]domain.Edge, error)
+	Delete(ctx context.Context, id string) error
+	BulkReplace(ctx context.Context, imageID string, edges []domain.Edge) ([]domain.Edge, error)
+}
+
+type edgeAnnotationRepository interface {
+	Get(ctx context.Context, id string) (domain.Annotation, error)
+	ListByImage(ctx context.Context, imageID string) ([]domain.Annotation, error)
+}
+
+type edgeLabelRepository interface {
+	Get(ctx context.Context, id string) (domain.LabelDefinition, error)
+}
+
 // EdgeUsecase coordinates edge operations and graph validation.
 type EdgeUsecase struct {
-	edgeRepo       *sqlite.EdgeRepository
-	annotationRepo *sqlite.AnnotationRepository
-	labelRepo      *sqlite.LabelRepository
+	edgeRepo       edgeRepository
+	annotationRepo edgeAnnotationRepository
+	labelRepo      edgeLabelRepository
 }
 
 // NewEdgeUsecase creates an EdgeUsecase.
-func NewEdgeUsecase(edgeRepo *sqlite.EdgeRepository, annotationRepo *sqlite.AnnotationRepository, labelRepo *sqlite.LabelRepository) *EdgeUsecase {
+func NewEdgeUsecase(edgeRepo edgeRepository, annotationRepo edgeAnnotationRepository, labelRepo edgeLabelRepository) *EdgeUsecase {
 	return &EdgeUsecase{
 		edgeRepo:       edgeRepo,
 		annotationRepo: annotationRepo,
@@ -96,196 +110,4 @@ func (u *EdgeUsecase) BulkReplace(ctx context.Context, imageID string, edges []d
 	}
 
 	return u.edgeRepo.BulkReplace(ctx, imageID, candidateEdges)
-}
-
-func (u *EdgeUsecase) validateEdgeSet(ctx context.Context, imageID string, edges []domain.Edge) error {
-	relations := make(map[edgeRelation]struct{}, len(edges))
-	readingOrderNext := make(map[string][]string)
-	keySources := make(map[string]string)
-	keyTargets := make(map[string]string)
-	tableCellTargets := make(map[string]string)
-	categoryByAnnotationID := make(map[string]domain.LabelCategory)
-
-	for _, edge := range edges {
-		if !isValidEdgeType(edge.Type) {
-			return ErrInvalidEdgeType
-		}
-		if edge.SourceAnnotationID == edge.TargetAnnotationID {
-			return ErrSelfEdge
-		}
-
-		relation := edgeRelation{
-			sourceAnnotationID: edge.SourceAnnotationID,
-			targetAnnotationID: edge.TargetAnnotationID,
-			edgeType:           edge.Type,
-		}
-		if _, ok := relations[relation]; ok {
-			return ErrDuplicateEdge
-		}
-		relations[relation] = struct{}{}
-
-		sourceAnnotation, err := u.annotationRepo.Get(ctx, edge.SourceAnnotationID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrEdgeAnnotationNotFound
-			}
-			return err
-		}
-		targetAnnotation, err := u.annotationRepo.Get(ctx, edge.TargetAnnotationID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrEdgeAnnotationNotFound
-			}
-			return err
-		}
-		if sourceAnnotation.ImageID != imageID || targetAnnotation.ImageID != imageID {
-			return ErrEdgeImageMismatch
-		}
-
-		switch edge.Type {
-		case domain.EdgeTypeReadingOrder:
-			readingOrderNext[edge.SourceAnnotationID] = append(readingOrderNext[edge.SourceAnnotationID], edge.TargetAnnotationID)
-		case domain.EdgeTypeKeyValue:
-			if err := u.validateKeyValueEdge(ctx, sourceAnnotation, targetAnnotation, categoryByAnnotationID, keySources, keyTargets); err != nil {
-				return err
-			}
-		case domain.EdgeTypeTableCell:
-			if err := u.validateTableCellEdge(ctx, sourceAnnotation, targetAnnotation, categoryByAnnotationID, tableCellTargets); err != nil {
-				return err
-			}
-		}
-	}
-
-	return rejectReadingOrderCycle(readingOrderNext)
-}
-
-func (u *EdgeUsecase) validateKeyValueEdge(
-	ctx context.Context,
-	sourceAnnotation domain.Annotation,
-	targetAnnotation domain.Annotation,
-	categoryByAnnotationID map[string]domain.LabelCategory,
-	keySources map[string]string,
-	keyTargets map[string]string,
-) error {
-	sourceCategory, ok, err := u.annotationCategory(ctx, sourceAnnotation, categoryByAnnotationID)
-	if err != nil {
-		return err
-	}
-	if !ok || sourceCategory != domain.LabelCategoryKey {
-		return ErrInvalidEdgeCategory
-	}
-	targetCategory, ok, err := u.annotationCategory(ctx, targetAnnotation, categoryByAnnotationID)
-	if err != nil {
-		return err
-	}
-	if !ok || targetCategory != domain.LabelCategoryValue {
-		return ErrInvalidEdgeCategory
-	}
-
-	if existingTargetID, ok := keySources[sourceAnnotation.ID]; ok && existingTargetID != targetAnnotation.ID {
-		return ErrEdgeCardinalityViolation
-	}
-	if existingSourceID, ok := keyTargets[targetAnnotation.ID]; ok && existingSourceID != sourceAnnotation.ID {
-		return ErrEdgeCardinalityViolation
-	}
-	keySources[sourceAnnotation.ID] = targetAnnotation.ID
-	keyTargets[targetAnnotation.ID] = sourceAnnotation.ID
-	return nil
-}
-
-func (u *EdgeUsecase) validateTableCellEdge(
-	ctx context.Context,
-	sourceAnnotation domain.Annotation,
-	targetAnnotation domain.Annotation,
-	categoryByAnnotationID map[string]domain.LabelCategory,
-	tableCellTargets map[string]string,
-) error {
-	sourceCategory, ok, err := u.annotationCategory(ctx, sourceAnnotation, categoryByAnnotationID)
-	if err != nil {
-		return err
-	}
-	if !ok || sourceCategory != domain.LabelCategoryTable {
-		return ErrInvalidEdgeCategory
-	}
-	targetCategory, ok, err := u.annotationCategory(ctx, targetAnnotation, categoryByAnnotationID)
-	if err != nil {
-		return err
-	}
-	if !ok || targetCategory != domain.LabelCategoryCell {
-		return ErrInvalidEdgeCategory
-	}
-
-	if existingTableID, ok := tableCellTargets[targetAnnotation.ID]; ok && existingTableID != sourceAnnotation.ID {
-		return ErrEdgeCardinalityViolation
-	}
-	tableCellTargets[targetAnnotation.ID] = sourceAnnotation.ID
-	return nil
-}
-
-func (u *EdgeUsecase) annotationCategory(ctx context.Context, annotation domain.Annotation, categoryByAnnotationID map[string]domain.LabelCategory) (domain.LabelCategory, bool, error) {
-	if annotation.LabelID == nil {
-		return "", false, nil
-	}
-	if category, ok := categoryByAnnotationID[annotation.ID]; ok {
-		return category, true, nil
-	}
-	label, err := u.labelRepo.Get(ctx, *annotation.LabelID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-	categoryByAnnotationID[annotation.ID] = label.Category
-	return label.Category, true, nil
-}
-
-func rejectReadingOrderCycle(readingOrderNext map[string][]string) error {
-	const (
-		unvisited = 0
-		visiting  = 1
-		visited   = 2
-	)
-	visitStateByAnnotationID := make(map[string]int, len(readingOrderNext))
-
-	var visit func(annotationID string) bool
-	visit = func(annotationID string) bool {
-		switch visitStateByAnnotationID[annotationID] {
-		case visiting:
-			return true
-		case visited:
-			return false
-		}
-
-		visitStateByAnnotationID[annotationID] = visiting
-		for _, nextAnnotationID := range readingOrderNext[annotationID] {
-			if visit(nextAnnotationID) {
-				return true
-			}
-		}
-		visitStateByAnnotationID[annotationID] = visited
-		return false
-	}
-
-	for annotationID := range readingOrderNext {
-		if visitStateByAnnotationID[annotationID] == unvisited && visit(annotationID) {
-			return ErrReadingOrderCycle
-		}
-	}
-	return nil
-}
-
-func isValidEdgeType(edgeType domain.EdgeType) bool {
-	switch edgeType {
-	case domain.EdgeTypeReadingOrder, domain.EdgeTypeKeyValue, domain.EdgeTypeTableCell:
-		return true
-	default:
-		return false
-	}
-}
-
-type edgeRelation struct {
-	sourceAnnotationID string
-	targetAnnotationID string
-	edgeType           domain.EdgeType
 }

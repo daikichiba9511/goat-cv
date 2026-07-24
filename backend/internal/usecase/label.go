@@ -4,17 +4,23 @@ import (
 	"context"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
-	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 
+type labelRepository interface {
+	Create(ctx context.Context, label domain.LabelDefinition) (domain.LabelDefinition, error)
+	ListByProject(ctx context.Context, projectID string) ([]domain.LabelDefinition, error)
+	Update(ctx context.Context, label domain.LabelDefinition) (domain.LabelDefinition, error)
+	Delete(ctx context.Context, id string) error
+}
+
 // LabelUsecase coordinates label definition operations.
 type LabelUsecase struct {
-	repo *sqlite.LabelRepository
+	repo labelRepository
 }
 
 // NewLabelUsecase creates a LabelUsecase.
-func NewLabelUsecase(repo *sqlite.LabelRepository) *LabelUsecase {
+func NewLabelUsecase(repo labelRepository) *LabelUsecase {
 	return &LabelUsecase{repo: repo}
 }
 

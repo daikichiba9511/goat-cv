@@ -4,17 +4,24 @@ import (
 	"context"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
-	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 
+type projectRepository interface {
+	Create(ctx context.Context, id, name string) (domain.Project, error)
+	Get(ctx context.Context, id string) (domain.Project, error)
+	List(ctx context.Context) ([]domain.Project, error)
+	Update(ctx context.Context, id, name string) (domain.Project, error)
+	Delete(ctx context.Context, id string) error
+}
+
 // ProjectUsecase coordinates project operations.
 type ProjectUsecase struct {
-	repo *sqlite.ProjectRepository
+	repo projectRepository
 }
 
 // NewProjectUsecase creates a ProjectUsecase.
-func NewProjectUsecase(repo *sqlite.ProjectRepository) *ProjectUsecase {
+func NewProjectUsecase(repo projectRepository) *ProjectUsecase {
 	return &ProjectUsecase{repo: repo}
 }
 

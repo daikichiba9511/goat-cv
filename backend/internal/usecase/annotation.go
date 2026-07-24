@@ -4,17 +4,24 @@ import (
 	"context"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
-	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 
+type annotationRepository interface {
+	Create(ctx context.Context, annotation domain.Annotation) (domain.Annotation, error)
+	ListByImage(ctx context.Context, imageID string) ([]domain.Annotation, error)
+	Update(ctx context.Context, annotation domain.Annotation) (domain.Annotation, error)
+	Delete(ctx context.Context, id string) error
+	BulkReplace(ctx context.Context, imageID string, annotations []domain.Annotation) ([]domain.Annotation, error)
+}
+
 // AnnotationUsecase coordinates annotation operations.
 type AnnotationUsecase struct {
-	repo *sqlite.AnnotationRepository
+	repo annotationRepository
 }
 
 // NewAnnotationUsecase creates an AnnotationUsecase.
-func NewAnnotationUsecase(repo *sqlite.AnnotationRepository) *AnnotationUsecase {
+func NewAnnotationUsecase(repo annotationRepository) *AnnotationUsecase {
 	return &AnnotationUsecase{repo: repo}
 }
 

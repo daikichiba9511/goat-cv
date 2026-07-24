@@ -162,10 +162,11 @@ func TestEdgeUsecaseBulkReplaceRejectsInvalidSetWithoutChangingExistingEdges(t *
 
 type edgeFixture struct {
 	ctx     context.Context
+	db      *sql.DB
 	usecase *usecase.EdgeUsecase
 }
 
-func newEdgeFixture(t *testing.T) edgeFixture {
+func newEdgeFixture(t testing.TB) edgeFixture {
 	t.Helper()
 
 	databaseName := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
@@ -198,11 +199,12 @@ func newEdgeFixture(t *testing.T) edgeFixture {
 
 	return edgeFixture{
 		ctx:     ctx,
+		db:      db,
 		usecase: usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo),
 	}
 }
 
-func insertEdgeFixtures(t *testing.T, ctx context.Context, db *sql.DB) {
+func insertEdgeFixtures(t testing.TB, ctx context.Context, db *sql.DB) {
 	t.Helper()
 
 	execSQL(t, ctx, db, `INSERT INTO projects (id, name) VALUES (?, ?)`, "project-1", "Project 1")
@@ -247,7 +249,7 @@ func insertEdgeFixtures(t *testing.T, ctx context.Context, db *sql.DB) {
 	}
 }
 
-func execSQL(t *testing.T, ctx context.Context, db *sql.DB, query string, args ...any) {
+func execSQL(t testing.TB, ctx context.Context, db *sql.DB, query string, args ...any) {
 	t.Helper()
 	if _, err := db.ExecContext(ctx, query, args...); err != nil {
 		t.Fatalf("exec %q: %v", query, err)
