@@ -60,11 +60,13 @@ const markdownComponents: Components = {
 // GuidelinePanel keeps Project manuals available without changing Canvas editing state.
 export default function GuidelinePanel() {
   const {
+    currentProjectId,
     guidelines,
     createGuideline,
     updateGuideline,
     deleteGuideline,
   } = useProjectStore(useShallow((state) => ({
+    currentProjectId: state.currentProject?.id ?? null,
     guidelines: state.guidelines,
     createGuideline: state.createGuideline,
     updateGuideline: state.updateGuideline,
@@ -77,6 +79,16 @@ export default function GuidelinePanel() {
   const [displayOrder, setDisplayOrder] = useState("0");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Why: Projectを切り替えた後に、直前のProjectの選択や編集中本文を表示・保存させない。
+    setSelectedId(null);
+    setEditorMode("view");
+    setTitle("");
+    setBody("");
+    setDisplayOrder("0");
+    setError(null);
+  }, [currentProjectId]);
 
   useEffect(() => {
     if (selectedId && guidelines.some((guideline) => guideline.id === selectedId)) {

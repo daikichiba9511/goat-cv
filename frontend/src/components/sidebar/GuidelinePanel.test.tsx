@@ -112,4 +112,29 @@ describe("GuidelinePanel", () => {
     });
     expect(await screen.findByText("No guidelines")).toBeTruthy();
   });
+
+  it("discards editing state when the current Project changes", async () => {
+    const otherProject = { ...project, id: "project-2", name: "Project Two" };
+    const otherGuideline = {
+      ...unsafeGuideline,
+      id: "guideline-2",
+      project_id: otherProject.id,
+      title: "Other rules",
+      body: "Other body",
+    };
+    useProjectStore.setState({ guidelines: [unsafeGuideline] });
+    render(<GuidelinePanel />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit guideline" }));
+    fireEvent.change(screen.getByLabelText("Guideline body"), {
+      target: { value: "Unsaved previous Project body" },
+    });
+    useProjectStore.setState({
+      currentProject: otherProject,
+      guidelines: [otherGuideline],
+    });
+
+    expect(await screen.findByRole("heading", { name: "Other rules" })).toBeTruthy();
+    expect(screen.queryByDisplayValue("Unsaved previous Project body")).toBeNull();
+  });
 });
