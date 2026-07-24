@@ -446,7 +446,9 @@ Validation and transaction rules:
   "annotation_id": "0194...",
   "image_id": "0194...",
   "resolved": false,
-  "created_at": "2026-03-23T12:00:00Z"
+  "target_deleted": false,
+  "created_at": "2026-03-23T12:00:00Z",
+  "updated_at": "2026-03-23T12:00:00Z"
 }
 
 // PATCH /images/:imageId/comments/:commentId
@@ -464,7 +466,8 @@ Validation and transaction rules:
 `resolved`は作成時に`false`となり、`PATCH`ではbooleanの`resolved`だけを必須とする。
 一覧は`created_at`、Comment IDの順で返し、CommentがないImageでは`items: []`を返す。
 更新と削除では、Comment IDが存在しない場合と指定Imageに属さない場合のどちらも`404 Not Found`を返す。
-Annotationを削除した場合は属するCommentも削除するが、同じAnnotation IDを保つ更新とgraph保存ではCommentを保持する。
+Annotationを削除してもCommentは削除せず、以後の一覧では`annotation_id`を保持したまま`target_deleted: true`を返す。
+Imageを削除した場合は、そのImageに属するCommentも削除する。
 Comment本文の表示ではraw HTMLと埋め込み画像を描画しない。
 
 ### Export

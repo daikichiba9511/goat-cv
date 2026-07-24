@@ -36,7 +36,7 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 | Annotation | 画像上の領域。BBox または Polygon で表す |
 | Edge | Annotation 間の有向関係。Reading Order、KV、Table Cell を表す |
 | Guideline | プロジェクト単位の作業マニュアル |
-| Comment | Image または Annotation に紐づく QA・エスカレーション記録 |
+| Comment | Image または Annotation に紐づく質問、問題、補足のQA記録 |
 
 ## Functional Requirements
 
@@ -100,7 +100,8 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - Commentは`question`、`issue`、`note`のtype、Markdown形式のbody、author、resolvedを持つ
 - Commentのresolvedは解決済みと未解決の間で相互に変更できる
 - Annotationを選択した場合は、そのAnnotationに属するCommentをComments panelへ表示する
-- Annotationを削除した場合は属するCommentも削除し、同じAnnotation IDの編集とgraph保存では保持する
+- Annotationを削除してもCommentはQAの経緯として保持し、対象が削除済みであることを表示する
+- Commentの操作は対象Imageの範囲に制限し、別Imageまたは別Projectの対象を指定できない
 - Commentのraw HTMLと埋め込み画像は描画せず、Markdownからscriptを実行できないようにする
 
 ### Export

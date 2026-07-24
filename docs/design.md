@@ -109,15 +109,16 @@ Project 1 ---* Image 1 ---* Annotation
                             |     ├─ target_annotation_id
                             |     └─ type: "reading_order" | "key_value" | "table_cell"
                             |
-                            └──* Comment (QA / Escalation)
+                            └──* Comment (QA)
                                   |
                                   ├─ id
                                   ├─ author
                                   ├─ body (Markdown)
                                   ├─ type: "question" | "issue" | "note"
-                                  ├─ annotation_id (nullable, 特定Annotationへの指摘)
+                                  ├─ annotation_id (nullable, 論理参照)
                                   ├─ resolved: bool
-                                  └─ created_at
+                                  ├─ created_at
+                                  └─ updated_at
 ```
 
 ### Image Status (Workflow)
@@ -146,7 +147,7 @@ Project 1 ---* Image 1 ---* Annotation
 - **Edge** — Annotation間の有向関係（辺）。typeによって関係の意味が変わる
 - **LabelDefinition** — プロジェクト単位で定義するラベル体系。categoryでタスク種別を区別
 - **Guideline** — プロジェクト単位のアノテーションマニュアル。Markdown形式、複数ページ構成
-- **Comment** — Image全体または特定Annotationに対するQAフィードバック
+- **Comment** — Image全体または特定Annotationに対する質問、問題、補足。Annotationが削除された後もQAの経緯として保持する
 
 Image単位でAnnotation(ノード) + Edge(辺) の有向グラフを構成する。
 
@@ -361,8 +362,11 @@ Comments panelはImage全体と選択中Annotationの表示対象を切り替え
 CanvasまたはObjects tabで永続化済みAnnotationを選択した場合は、そのAnnotationのCommentを表示対象にする。
 未保存AnnotationにはCommentを作成できず、保存後に発行されたAnnotation IDを対象とする。
 Comment本文はGuidelineと同じ安全なMarkdown rendererで表示する。
-Annotationを削除した場合は、そのAnnotationに属するCommentも削除する。
-ただし、同じAnnotation IDを保つ座標変更やgraph保存ではCommentを保持する。
+CommentはImageを所有境界とし、作成、一覧、解決状態の更新、削除をすべてImage-scoped APIで行う。
+Annotation向けCommentを作成するときは、そのAnnotationが指定Imageに属することを検証する。
+`annotation_id`には外部キーを設定しない。
+Annotation Graphの保存がAnnotationを同じIDで全置換するため、外部キーのcascadeや`SET NULL`を使うと通常の保存だけでCommentが消失またはImage向けに変質するためである。
+Annotationを実際に削除した場合もCommentを保持し、一覧レスポンスの`target_deleted`で参照先が削除済みであることを示す。
 
 ## Directory Structure
 
