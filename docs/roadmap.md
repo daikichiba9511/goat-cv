@@ -13,23 +13,40 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 - Each PR should be one self-contained change
 - Each PR description should explain what changed, why it changed, important context, and validation
 
+## Completed Work
+
+| Order | Change | Evidence | Result |
+|-------|--------|----------|--------|
+| 0 | Prepare public repository | [PR #1](https://github.com/daikichiba9511/goat-cv/pull/1) | Published the `goat-cv` repository with the renamed module, README, and local build instructions |
+| 1 | Add product specification and roadmap | [PR #2](https://github.com/daikichiba9511/goat-cv/pull/2), [PR #3](https://github.com/daikichiba9511/goat-cv/pull/3) | Defined the product scope, clarified the general CV focus, and established the PR-level roadmap |
+| 2 | Add edge API validation | [PR #5](https://github.com/daikichiba9511/goat-cv/pull/5), [PR #8](https://github.com/daikichiba9511/goat-cv/pull/8) | Added Edge APIs and validation for cross-image, duplicate, self-referential, and cyclic reading-order edges |
+| 3 | Add edge annotation UI | [PR #6](https://github.com/daikichiba9511/goat-cv/pull/6), [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7), [PR #8](https://github.com/daikichiba9511/goat-cv/pull/8) | Added label-aware BBox presentation and Reading Order edge drawing, display, save, reload, and deletion |
+
 ## Planned Work
 
-| Order | Change | Scope | Deliverable |
-|-------|--------|-------|-------------|
-| 0 | Prepare public repository | Public repository preparation | Rename module path to `goat-cv`, add README, document roadmap, keep builds green |
-| 1 | Add product specification and roadmap | Product planning | Product specification and PR-level roadmap |
-| 2 | Add edge API validation | Edge backend | Edge usecase validation, API handlers, tests |
-| 3 | Add edge annotation UI | Edge UI | Reading Order edge drawing, edge display, save/load wiring |
-| 4 | Add polygon API validation | Polygon backend | Polygon coordinate validation and tests |
-| 5 | Add polygon annotation UI | Polygon UI | Polygon drawing, editing, save/load |
-| 6 | Add COCO and YOLO export | Export | COCO and YOLO export for node annotations |
-| 7 | Add workflow status transitions | Workflow | Image status transitions and review actions |
-| 8 | Add guideline management | Guidelines | Guideline storage, API, and viewer panel |
-| 9 | Add QA comments | QA comments | Image/Annotation comments and resolved state |
-| 10 | Add pre-inference candidates | Model assistance | Model API integration and prediction candidates |
-| 11 | Decide collaboration architecture | Collaboration | WebSocket/CRDT/OT architecture spike |
-| 12 | Add initial realtime sync | Collaboration | Initial realtime synchronization implementation |
+| Order | Change | Tracking | Deliverable |
+|-------|--------|----------|-------------|
+| 4 | Validate annotation coordinates | [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) | Atomic API validation for normalized Bounding Box and Polygon coordinates |
+| 5 | Save the image graph atomically | [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) | One transactional save contract for Annotations and Edges with explicit client ID mapping |
+| 6 | Add annotation inspector | [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) | Synchronized list and Canvas selection for annotations, labels, and relationships |
+| 7 | Add remaining edge relation UI | [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) | UI support for `key_value` and `table_cell` Edges without regressing `reading_order` |
+| 8 | Add polygon annotation UI | [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12) | Polygon drawing, vertex editing, deletion, save, and reload |
+| 9 | Add COCO and YOLO export | [Issue #14](https://github.com/daikichiba9511/goat-cv/issues/14) | Documented category rules and COCO/YOLO export for supported node annotations |
+| 10 | Decide workflow status transitions | [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | One state-machine specification shared by the product, design, and API documents |
+| 11 | Implement workflow status transitions | Follow-up to [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | Image status APIs, review actions, UI, and behavior tests derived from the approved state machine |
+| 12 | Add guideline management | [Issue #16](https://github.com/daikichiba9511/goat-cv/issues/16) | Guideline storage, API, safe Markdown rendering, and viewer panel |
+| 13 | Add QA comments | [Issue #17](https://github.com/daikichiba9511/goat-cv/issues/17) | Image/Annotation comments with type and resolved state |
+| 14 | Design pre-inference integration | [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Provider-independent API contract and candidate lifecycle decision |
+| 15 | Add pre-inference candidates | Follow-up to [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Model API integration and accept, edit, and discard workflows derived from the approved design |
+| 16 | Decide collaboration architecture | [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Comparison and decision for the first collaboration and conflict boundary |
+| 17 | Add initial realtime sync | Follow-up to [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Narrow realtime synchronization implementation derived from the architecture decision |
+
+## Dependency Order
+
+- [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) precedes [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13), so the atomic graph endpoint can reuse one annotation validation boundary.
+- [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) is independent of the save-contract changes and follows the backend foundation work to improve object and label inspection before the remaining drawing tools are added.
+- [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) precedes [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12), so new Edge and Polygon workflows do not extend the current two-request save path.
+- Issues [#15](https://github.com/daikichiba9511/goat-cv/issues/15), [#18](https://github.com/daikichiba9511/goat-cv/issues/18), and [#19](https://github.com/daikichiba9511/goat-cv/issues/19) are decision work. Each creates smaller implementation issues only after its behavior or architecture is explicit.
 
 ## Milestones
 
@@ -37,10 +54,11 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 
 Goal: make the repository understandable and ready for PR-based development.
 
-PRs:
+Completed PRs:
 
-- Prepare public repository
-- Add product specification and roadmap
+- [Prepare public repository](https://github.com/daikichiba9511/goat-cv/pull/1)
+- [Add product specification and roadmap](https://github.com/daikichiba9511/goat-cv/pull/2)
+- [Clarify the general CV product scope](https://github.com/daikichiba9511/goat-cv/pull/3)
 
 Completion criteria:
 
@@ -54,17 +72,23 @@ Completion criteria:
 
 Goal: support graph-structured CV datasets by connecting annotations with directed edges.
 
-PRs:
+Work items:
 
-- Add edge API validation
-- Add edge annotation UI
-- Add polygon API validation
-- Add polygon annotation UI
+- Completed: Edge API validation in [PR #5](https://github.com/daikichiba9511/goat-cv/pull/5)
+- Completed: Reading Order edge UI in [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7)
+- [Issue #11: Validate annotation coordinates](https://github.com/daikichiba9511/goat-cv/issues/11)
+- [Issue #13: Save the image graph atomically](https://github.com/daikichiba9511/goat-cv/issues/13)
+- [Issue #9: Add annotation inspector](https://github.com/daikichiba9511/goat-cv/issues/9)
+- [Issue #10: Add remaining edge relation UI](https://github.com/daikichiba9511/goat-cv/issues/10)
+- [Issue #12: Add polygon annotation UI](https://github.com/daikichiba9511/goat-cv/issues/12)
 
 Completion criteria:
 
 - Edge APIs reject invalid cross-image, duplicate, self-referential, and cyclic reading-order edges
-- Frontend can create, display, delete, save, and reload reading-order edges
+- Annotation APIs reject malformed or out-of-range Bounding Box and Polygon coordinates without partial replacement
+- Annotation and Edge changes are saved as one image-level transaction
+- Frontend can create, display, delete, save, and reload `reading_order`, `key_value`, and `table_cell` edges
+- Frontend can inspect the Label, shape type, and relationships of each annotation outside the Canvas
 - Frontend can create, edit, save, and reload Polygon annotations
 - GOAT JSON includes BBox, Polygon, and Edge data
 
@@ -72,9 +96,9 @@ Completion criteria:
 
 Goal: provide common dataset export formats for downstream ML training.
 
-PRs:
+Work item:
 
-- Add COCO and YOLO export
+- [Issue #14: Add COCO and YOLO export](https://github.com/daikichiba9511/goat-cv/issues/14)
 
 Completion criteria:
 
@@ -87,15 +111,16 @@ Completion criteria:
 
 Goal: support review-oriented annotation workflows.
 
-PRs:
+Work items:
 
-- Add workflow status transitions
-- Add guideline management
-- Add QA comments
+- [Issue #15: Decide workflow status transitions](https://github.com/daikichiba9511/goat-cv/issues/15), followed by implementation issues
+- [Issue #16: Add guideline management](https://github.com/daikichiba9511/goat-cv/issues/16)
+- [Issue #17: Add QA comments](https://github.com/daikichiba9511/goat-cv/issues/17)
 
 Completion criteria:
 
-- Image status can move through the documented workflow
+- One state machine defines the status behavior across the product, design, API, implementation, and tests
+- Image status can move only through transitions allowed by the documented workflow
 - Guideline pages can be stored and viewed inside the annotator UI
 - Comments can be attached to an Image or Annotation and marked resolved
 
@@ -103,9 +128,10 @@ Completion criteria:
 
 Goal: let model output accelerate manual annotation without making predictions authoritative.
 
-PRs:
+Work items:
 
-- Add pre-inference candidates
+- [Issue #18: Design pre-inference integration](https://github.com/daikichiba9511/goat-cv/issues/18)
+- Implementation issues created from the approved contract and candidate lifecycle
 
 Completion criteria:
 
@@ -117,10 +143,10 @@ Completion criteria:
 
 Goal: identify and implement the first safe collaborative editing model.
 
-PRs:
+Work items:
 
-- Decide collaboration architecture
-- Add initial realtime sync
+- [Issue #19: Decide collaboration architecture](https://github.com/daikichiba9511/goat-cv/issues/19)
+- An initial realtime synchronization issue created from the approved architecture
 
 Completion criteria:
 
@@ -131,11 +157,12 @@ Completion criteria:
 ## Per-PR Checklist
 
 - Update docs when behavior or public API changes
+- Link the tracking issue and close it only when its acceptance criteria are met
 - Add or update tests for backend validation and export behavior
 - Run `cd backend && go test ./...`
 - Run `cd frontend && npm run build`
 - Keep PRs draft until the checks and manual smoke path are described
 
-## Done
+## Current Product Baseline
 
-Phase 1 implemented the single-user synchronous workflow: image upload, BBox drawing, save/load, label assignment, transform controls, and GOAT JSON export.
+The `main` branch supports the single-user synchronous workflow: image upload, BBox drawing, save/load, label assignment, transform controls, GOAT JSON export, Edge APIs, and Reading Order edge editing.
