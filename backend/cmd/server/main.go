@@ -52,6 +52,7 @@ func main() {
 	queries := sqlcgen.New(db)
 	projectRepo := sqlite.NewProjectRepository(queries)
 	labelRepo := sqlite.NewLabelRepository(queries)
+	guidelineRepo := sqlite.NewGuidelineRepository(queries)
 	imageRepo := sqlite.NewImageRepository(queries)
 	annotationRepo := sqlite.NewAnnotationRepository(db, queries)
 	edgeRepo := sqlite.NewEdgeRepository(db, queries)
@@ -60,6 +61,7 @@ func main() {
 	// Usecases
 	projectUC := usecase.NewProjectUsecase(projectRepo)
 	labelUC := usecase.NewLabelUsecase(labelRepo)
+	guidelineUC := usecase.NewGuidelineUsecase(guidelineRepo)
 	imageUC := usecase.NewImageUsecase(imageRepo, storagePath)
 	annotationUC := usecase.NewAnnotationUsecase(annotationRepo)
 	edgeUC := usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo)
@@ -75,6 +77,7 @@ func main() {
 	// Handlers
 	projectHandler := handler.NewProjectHandler(projectUC)
 	labelHandler := handler.NewLabelHandler(labelUC)
+	guidelineHandler := handler.NewGuidelineHandler(guidelineUC)
 	imageHandler := handler.NewImageHandler(imageUC)
 	annotationHandler := handler.NewAnnotationHandler(annotationUC)
 	edgeHandler := handler.NewEdgeHandler(edgeUC)
@@ -98,6 +101,9 @@ func main() {
 		r.Mount("/", projectHandler.Routes())
 		r.Route("/{projectId}/labels", func(r chi.Router) {
 			labelHandler.Routes(r)
+		})
+		r.Route("/{projectId}/guidelines", func(r chi.Router) {
+			guidelineHandler.Routes(r)
 		})
 		r.Route("/{projectId}/images", func(r chi.Router) {
 			imageHandler.ProjectRoutes(r)

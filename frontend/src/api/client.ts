@@ -6,6 +6,7 @@ import type {
   Edge,
   ListResponse,
   LabelCategory,
+  Guideline,
   ImageGraphSaveRequest,
   ImageGraphSaveResponse,
 } from "../types";
@@ -92,6 +93,48 @@ export async function deleteLabel(
   projectId: string,
 ): Promise<void> {
   return request(`/projects/${projectId}/labels/${labelId}`, {
+    method: "DELETE",
+  });
+}
+
+// Guidelines
+
+export async function createGuideline(
+  projectId: string,
+  title: string,
+  body: string,
+  displayOrder: number,
+): Promise<Guideline> {
+  return request(`/projects/${projectId}/guidelines`, {
+    method: "POST",
+    ...json({ title, body, display_order: displayOrder }),
+  });
+}
+
+export async function listGuidelines(
+  projectId: string,
+): Promise<ListResponse<Guideline>> {
+  return request(`/projects/${projectId}/guidelines`);
+}
+
+export async function updateGuideline(
+  projectId: string,
+  guidelineId: string,
+  title: string,
+  body: string,
+  displayOrder: number,
+): Promise<Guideline> {
+  return request(`/projects/${projectId}/guidelines/${guidelineId}`, {
+    method: "PATCH",
+    ...json({ title, body, display_order: displayOrder }),
+  });
+}
+
+export async function deleteGuideline(
+  projectId: string,
+  guidelineId: string,
+): Promise<void> {
+  return request(`/projects/${projectId}/guidelines/${guidelineId}`, {
     method: "DELETE",
   });
 }

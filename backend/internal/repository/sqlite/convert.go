@@ -48,6 +48,17 @@ func toLabelDefinition(row sqlcgen.LabelDefinition) domain.LabelDefinition {
 	}
 }
 
+func toGuideline(row sqlcgen.Guideline) domain.Guideline {
+	return domain.Guideline{
+		ID:           row.ID,
+		ProjectID:    row.ProjectID,
+		Title:        row.Title,
+		Body:         row.Body,
+		DisplayOrder: int(row.DisplayOrder),
+		UpdatedAt:    parseTime(row.UpdatedAt),
+	}
+}
+
 func toImage(row sqlcgen.Image) domain.Image {
 	return domain.Image{
 		ID:             row.ID,

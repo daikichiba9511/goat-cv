@@ -22,6 +22,15 @@ export type LabelDefinition = {
   category: LabelCategory;
 };
 
+export type Guideline = {
+  id: string;
+  project_id: string;
+  title: string;
+  body: string;
+  display_order: number;
+  updated_at: string;
+};
+
 export type ImageStatus =
   | "pending"
   | "annotated"
