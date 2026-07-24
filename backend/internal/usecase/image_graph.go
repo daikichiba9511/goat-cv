@@ -64,17 +64,35 @@ type imageGraphRepository interface {
 
 // ImageGraphUsecase validates and atomically saves the complete annotation graph for an image.
 type ImageGraphUsecase struct {
-	repository imageGraphRepository
-	labelRepo  edgeLabelRepository
+	repository     imageGraphRepository
+	labelRepo      edgeLabelRepository
+	workflowImages imageWorkflowReader
 }
 
 // NewImageGraphUsecase creates an ImageGraphUsecase.
-func NewImageGraphUsecase(repository imageGraphRepository, labelRepo edgeLabelRepository) *ImageGraphUsecase {
-	return &ImageGraphUsecase{repository: repository, labelRepo: labelRepo}
+func NewImageGraphUsecase(
+	repository imageGraphRepository,
+	labelRepo edgeLabelRepository,
+	workflowImages imageWorkflowReader,
+) *ImageGraphUsecase {
+	return &ImageGraphUsecase{
+		repository:     repository,
+		labelRepo:      labelRepo,
+		workflowImages: workflowImages,
+	}
 }
 
 // Save resolves request-local identities, validates the complete graph, and persists it atomically.
 func (u *ImageGraphUsecase) Save(ctx context.Context, imageID string, graph ImageGraphInput) (SavedImageGraph, error) {
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		imageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return SavedImageGraph{}, err
+	}
+
 	annotations, annotationClientIDs, annotationIDByClientID, err := prepareGraphAnnotations(imageID, graph.Annotations)
 	if err != nil {
 		return SavedImageGraph{}, err

@@ -66,8 +66,35 @@ func TestImageGraphSaveReturnsBadRequestForUnknownClientReference(t *testing.T) 
 	}
 }
 
+func TestImageGraphSaveReturnsConflictWhenWorkflowIsLocked(t *testing.T) {
+	imageGraphUsecase := usecase.NewImageGraphUsecase(
+		imageGraphHandlerTestRepository{},
+		imageGraphHandlerTestLabelRepository{},
+		imageGraphHandlerTestImageRepository{status: domain.ImageStatusPending, escalated: true},
+	)
+	imageGraphHandler := NewImageGraphHandler(imageGraphUsecase)
+	router := chi.NewRouter()
+	router.Route("/images/{imageId}/graph", imageGraphHandler.ImageRoutes)
+	request := httptest.NewRequest(
+		http.MethodPut,
+		"/images/image-1/graph/",
+		strings.NewReader(`{"annotations":[],"edges":[]}`),
+	)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusConflict, response.Body.String())
+	}
+}
+
 func newImageGraphTestRouter() chi.Router {
-	imageGraphUsecase := usecase.NewImageGraphUsecase(imageGraphHandlerTestRepository{}, imageGraphHandlerTestLabelRepository{})
+	imageGraphUsecase := usecase.NewImageGraphUsecase(
+		imageGraphHandlerTestRepository{},
+		imageGraphHandlerTestLabelRepository{},
+		imageGraphHandlerTestImageRepository{status: domain.ImageStatusPending},
+	)
 	imageGraphHandler := NewImageGraphHandler(imageGraphUsecase)
 	router := chi.NewRouter()
 	router.Route("/images/{imageId}/graph", imageGraphHandler.ImageRoutes)
@@ -93,4 +120,13 @@ type imageGraphHandlerTestLabelRepository struct{}
 
 func (imageGraphHandlerTestLabelRepository) Get(_ context.Context, id string) (domain.LabelDefinition, error) {
 	return domain.LabelDefinition{ID: id, Category: domain.LabelCategoryObject}, nil
+}
+
+type imageGraphHandlerTestImageRepository struct {
+	status    domain.ImageStatus
+	escalated bool
+}
+
+func (repository imageGraphHandlerTestImageRepository) Get(_ context.Context, imageID string) (domain.Image, error) {
+	return domain.Image{ID: imageID, Status: repository.status, Escalated: repository.escalated}, nil
 }

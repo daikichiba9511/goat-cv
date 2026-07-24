@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -128,7 +129,12 @@ func toSavedImageGraphResponse(savedGraph usecase.SavedImageGraph) savedImageGra
 
 // writeImageGraphError maps graph validation and persistence errors to HTTP responses.
 func writeImageGraphError(responseWriter http.ResponseWriter, err error) {
+	if writeWorkflowOperationError(responseWriter, err) {
+		return
+	}
 	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		writeError(responseWriter, http.StatusNotFound, "image not found")
 	case errors.Is(err, usecase.ErrInvalidImageGraph),
 		errors.Is(err, usecase.ErrInvalidAnnotationType),
 		errors.Is(err, usecase.ErrInvalidAnnotationCoordinates),

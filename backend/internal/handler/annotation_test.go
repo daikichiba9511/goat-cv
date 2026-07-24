@@ -14,7 +14,10 @@ import (
 )
 
 func TestAnnotationBulkReplaceReturnsBadRequestWithInvalidArrayPosition(t *testing.T) {
-	annotationUsecase := usecase.NewAnnotationUsecase(annotationHandlerTestRepository{})
+	annotationUsecase := usecase.NewAnnotationUsecase(
+		annotationHandlerTestRepository{},
+		annotationHandlerTestImageRepository{},
+	)
 	annotationHandler := NewAnnotationHandler(annotationUsecase)
 	router := chi.NewRouter()
 	router.Route("/images/{imageId}/annotations", annotationHandler.ImageRoutes)
@@ -47,6 +50,10 @@ func (annotationHandlerTestRepository) Create(_ context.Context, annotation doma
 	return annotation, nil
 }
 
+func (annotationHandlerTestRepository) Get(_ context.Context, annotationID string) (domain.Annotation, error) {
+	return domain.Annotation{ID: annotationID, ImageID: "image-1"}, nil
+}
+
 func (annotationHandlerTestRepository) ListByImage(_ context.Context, _ string) ([]domain.Annotation, error) {
 	return nil, nil
 }
@@ -61,4 +68,10 @@ func (annotationHandlerTestRepository) Delete(_ context.Context, _ string) error
 
 func (annotationHandlerTestRepository) BulkReplace(_ context.Context, _ string, annotations []domain.Annotation) ([]domain.Annotation, error) {
 	return annotations, nil
+}
+
+type annotationHandlerTestImageRepository struct{}
+
+func (annotationHandlerTestImageRepository) Get(_ context.Context, imageID string) (domain.Image, error) {
+	return domain.Image{ID: imageID, Status: domain.ImageStatusPending}, nil
 }

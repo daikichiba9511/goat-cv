@@ -6,6 +6,9 @@ RETURNING *;
 -- name: ListEdgesByImage :many
 SELECT * FROM edges WHERE image_id = ? ORDER BY id;
 
+-- name: GetEdge :one
+SELECT * FROM edges WHERE id = ?;
+
 -- name: DeleteEdge :exec
 DELETE FROM edges WHERE id = ?;
 

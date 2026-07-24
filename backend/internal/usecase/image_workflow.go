@@ -8,9 +8,30 @@ import (
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
 )
 
+type imageWorkflowReader interface {
+	Get(ctx context.Context, imageID string) (domain.Image, error)
+}
+
 // ImageWorkflowConflictError reports a known event that is not allowed from the current Image state.
 type ImageWorkflowConflictError struct {
 	Event         domain.ImageWorkflowEvent
+	Current       domain.Image
+	AllowedEvents []domain.ImageWorkflowEvent
+}
+
+// ImageWorkflowOperation identifies a state-sensitive Image mutation.
+type ImageWorkflowOperation string
+
+const (
+	// ImageWorkflowOperationGraphEdit changes an Image Annotation Graph.
+	ImageWorkflowOperationGraphEdit ImageWorkflowOperation = "graph_edit"
+	// ImageWorkflowOperationTransformEdit changes Image transform metadata.
+	ImageWorkflowOperationTransformEdit ImageWorkflowOperation = "transform_edit"
+)
+
+// ImageWorkflowOperationConflictError reports an operation blocked by the current Image state.
+type ImageWorkflowOperationConflictError struct {
+	Operation     ImageWorkflowOperation
 	Current       domain.Image
 	AllowedEvents []domain.ImageWorkflowEvent
 }
@@ -23,6 +44,16 @@ func (workflowError *ImageWorkflowConflictError) Error() string {
 	return fmt.Sprintf(
 		"image workflow event %q is not allowed from status %q with escalated=%t",
 		workflowError.Event,
+		workflowError.Current.Status,
+		workflowError.Current.Escalated,
+	)
+}
+
+// Error describes the blocked operation and current workflow state.
+func (workflowError *ImageWorkflowOperationConflictError) Error() string {
+	return fmt.Sprintf(
+		"image workflow operation %q is not allowed from status %q with escalated=%t",
+		workflowError.Operation,
 		workflowError.Current.Status,
 		workflowError.Current.Escalated,
 	)
@@ -86,6 +117,53 @@ func isKnownImageWorkflowEvent(event domain.ImageWorkflowEvent) bool {
 		}
 	}
 	return false
+}
+
+func isKnownImageStatus(status domain.ImageStatus) bool {
+	switch status {
+	case domain.ImageStatusPending,
+		domain.ImageStatusAnnotated,
+		domain.ImageStatusInReview,
+		domain.ImageStatusRejected,
+		domain.ImageStatusApproved:
+		return true
+	default:
+		return false
+	}
+}
+
+func requireImageWorkflowOperation(currentImage domain.Image, operation ImageWorkflowOperation) error {
+	allowed := false
+	if !currentImage.Escalated {
+		// Why: rejectedでは指摘修正のGraph編集だけを許可し、座標全体を無効にし得るtransformは再開しない。
+		switch operation {
+		case ImageWorkflowOperationGraphEdit:
+			allowed = currentImage.Status == domain.ImageStatusPending || currentImage.Status == domain.ImageStatusRejected
+		case ImageWorkflowOperationTransformEdit:
+			allowed = currentImage.Status == domain.ImageStatusPending
+		}
+	}
+	if allowed {
+		return nil
+	}
+	return &ImageWorkflowOperationConflictError{
+		Operation:     operation,
+		Current:       currentImage,
+		AllowedEvents: AllowedImageWorkflowEvents(currentImage),
+	}
+}
+
+func requireImageWorkflowOperationForImage(
+	ctx context.Context,
+	images imageWorkflowReader,
+	imageID string,
+	operation ImageWorkflowOperation,
+) error {
+	currentImage, err := images.Get(ctx, imageID)
+	if err != nil {
+		return err
+	}
+	return requireImageWorkflowOperation(currentImage, operation)
 }
 
 func applyImageWorkflowEvent(

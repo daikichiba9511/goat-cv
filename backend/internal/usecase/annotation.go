@@ -20,6 +20,7 @@ var (
 
 type annotationRepository interface {
 	Create(ctx context.Context, annotation domain.Annotation) (domain.Annotation, error)
+	Get(ctx context.Context, id string) (domain.Annotation, error)
 	ListByImage(ctx context.Context, imageID string) ([]domain.Annotation, error)
 	Update(ctx context.Context, annotation domain.Annotation) (domain.Annotation, error)
 	Delete(ctx context.Context, id string) error
@@ -28,16 +29,25 @@ type annotationRepository interface {
 
 // AnnotationUsecase coordinates annotation operations.
 type AnnotationUsecase struct {
-	repo annotationRepository
+	repo           annotationRepository
+	workflowImages imageWorkflowReader
 }
 
 // NewAnnotationUsecase creates an AnnotationUsecase.
-func NewAnnotationUsecase(repo annotationRepository) *AnnotationUsecase {
-	return &AnnotationUsecase{repo: repo}
+func NewAnnotationUsecase(repo annotationRepository, workflowImages imageWorkflowReader) *AnnotationUsecase {
+	return &AnnotationUsecase{repo: repo, workflowImages: workflowImages}
 }
 
 // Create creates an annotation for an image.
 func (u *AnnotationUsecase) Create(ctx context.Context, imageID string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		imageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return domain.Annotation{}, err
+	}
 	if err := validateAnnotationCoordinates(annType, coordinates); err != nil {
 		return domain.Annotation{}, err
 	}
@@ -59,6 +69,9 @@ func (u *AnnotationUsecase) ListByImage(ctx context.Context, imageID string) ([]
 
 // Update changes an annotation.
 func (u *AnnotationUsecase) Update(ctx context.Context, id string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
+	if err := u.requireGraphEditForAnnotation(ctx, id); err != nil {
+		return domain.Annotation{}, err
+	}
 	if err := validateAnnotationCoordinates(annType, coordinates); err != nil {
 		return domain.Annotation{}, err
 	}
@@ -74,12 +87,37 @@ func (u *AnnotationUsecase) Update(ctx context.Context, id string, annType domai
 
 // Delete removes an annotation by ID.
 func (u *AnnotationUsecase) Delete(ctx context.Context, id string) error {
+	if err := u.requireGraphEditForAnnotation(ctx, id); err != nil {
+		return err
+	}
 	return u.repo.Delete(ctx, id)
+}
+
+func (u *AnnotationUsecase) requireGraphEditForAnnotation(ctx context.Context, annotationID string) error {
+	// Why: item routeにはImage IDがないため、永続化済みAnnotationの所有Imageを認可判定の正とする。
+	existingAnnotation, err := u.repo.Get(ctx, annotationID)
+	if err != nil {
+		return err
+	}
+	return requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		existingAnnotation.ImageID,
+		ImageWorkflowOperationGraphEdit,
+	)
 }
 
 // BulkReplace replaces all annotations for an image and returns the persisted rows.
 // Annotations with an empty ID are treated as new records and receive UUID v7 IDs.
 func (u *AnnotationUsecase) BulkReplace(ctx context.Context, imageID string, annotations []domain.Annotation) ([]domain.Annotation, error) {
+	if err := requireImageWorkflowOperationForImage(
+		ctx,
+		u.workflowImages,
+		imageID,
+		ImageWorkflowOperationGraphEdit,
+	); err != nil {
+		return nil, err
+	}
 	// Why: フロントエンドは未保存Annotationを一時IDで扱うため、永続化境界でだけUUID v7へ置き換える。
 	// Why not: Phase 1では操作ログ同期をしないので、個別差分ではなく画像単位の現在状態を正とする。
 	candidateAnnotations := make([]domain.Annotation, len(annotations))

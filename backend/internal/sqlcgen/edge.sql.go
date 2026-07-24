@@ -60,6 +60,23 @@ func (q *Queries) DeleteEdgesByImage(ctx context.Context, imageID string) error 
 	return err
 }
 
+const getEdge = `-- name: GetEdge :one
+SELECT id, image_id, source_annotation_id, target_annotation_id, type FROM edges WHERE id = ?
+`
+
+func (q *Queries) GetEdge(ctx context.Context, id string) (Edge, error) {
+	row := q.db.QueryRowContext(ctx, getEdge, id)
+	var i Edge
+	err := row.Scan(
+		&i.ID,
+		&i.ImageID,
+		&i.SourceAnnotationID,
+		&i.TargetAnnotationID,
+		&i.Type,
+	)
+	return i, err
+}
+
 const listEdgesByImage = `-- name: ListEdgesByImage :many
 SELECT id, image_id, source_annotation_id, target_annotation_id, type FROM edges WHERE image_id = ? ORDER BY id
 `

@@ -203,8 +203,61 @@ func TestAnnotationUsecaseBulkReplaceRejectsDuplicatePersistentIDs(t *testing.T)
 	}
 }
 
+func TestAnnotationUsecaseItemMutationsRejectLockedImage(t *testing.T) {
+	for _, operation := range []string{"update", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			fixture := newAnnotationFixture(t)
+			originalCoordinates := domain.Coordinates(`{"x":0,"y":0,"width":1,"height":1}`)
+			annotation, err := fixture.usecase.Create(
+				fixture.ctx,
+				annotationTestImageID,
+				domain.AnnotationTypeBBox,
+				originalCoordinates,
+				nil,
+			)
+			if err != nil {
+				t.Fatalf("Create Annotation: %v", err)
+			}
+			execAnnotationSQL(
+				t,
+				fixture.ctx,
+				fixture.db,
+				`UPDATE images SET status = ? WHERE id = ?`,
+				domain.ImageStatusApproved,
+				annotationTestImageID,
+			)
+
+			switch operation {
+			case "update":
+				_, err = fixture.usecase.Update(
+					fixture.ctx,
+					annotation.ID,
+					domain.AnnotationTypeBBox,
+					domain.Coordinates(`{"x":0.1,"y":0.1,"width":0.5,"height":0.5}`),
+					nil,
+				)
+			case "delete":
+				err = fixture.usecase.Delete(fixture.ctx, annotation.ID)
+			}
+			var conflictError *usecase.ImageWorkflowOperationConflictError
+			if !errors.As(err, &conflictError) {
+				t.Fatalf("%s error = %v, want ImageWorkflowOperationConflictError", operation, err)
+			}
+
+			persisted, getError := fixture.repository.Get(fixture.ctx, annotation.ID)
+			if getError != nil {
+				t.Fatalf("Get Annotation after rejected %s: %v", operation, getError)
+			}
+			if string(persisted.Coordinates) != string(originalCoordinates) {
+				t.Fatalf("coordinates after rejected %s = %s, want %s", operation, persisted.Coordinates, originalCoordinates)
+			}
+		})
+	}
+}
+
 type annotationFixture struct {
 	ctx        context.Context
+	db         *sql.DB
 	repository *sqlite.AnnotationRepository
 	usecase    *usecase.AnnotationUsecase
 }
@@ -224,12 +277,17 @@ func newAnnotationFixture(t testing.TB) annotationFixture {
 		}
 	})
 
-	migration, err := os.ReadFile("../../db/migrations/001_init.sql")
-	if err != nil {
-		t.Fatalf("read migration: %v", err)
-	}
-	if _, err := db.Exec(string(migration)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, migrationPath := range []string{
+		"../../db/migrations/001_init.sql",
+		"../../db/migrations/004_image_workflow.sql",
+	} {
+		migration, err := os.ReadFile(migrationPath)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", migrationPath, err)
+		}
+		if _, err := db.Exec(string(migration)); err != nil {
+			t.Fatalf("apply migration %s: %v", migrationPath, err)
+		}
 	}
 
 	ctx := context.Background()
@@ -250,10 +308,12 @@ func newAnnotationFixture(t testing.TB) annotationFixture {
 
 	queries := sqlcgen.New(db)
 	repository := sqlite.NewAnnotationRepository(db, queries)
+	imageRepository := sqlite.NewImageRepository(queries)
 	return annotationFixture{
 		ctx:        ctx,
+		db:         db,
 		repository: repository,
-		usecase:    usecase.NewAnnotationUsecase(repository),
+		usecase:    usecase.NewAnnotationUsecase(repository, imageRepository),
 	}
 }
 

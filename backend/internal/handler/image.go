@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
 	"github.com/daikichiba9511/goat-cv/backend/internal/usecase"
@@ -22,6 +23,7 @@ type imageResponse struct {
 	FlipH          bool   `json:"flip_h"`
 	FlipV          bool   `json:"flip_v"`
 	Status         string `json:"status"`
+	Escalated      bool   `json:"escalated"`
 	UploadedAt     string `json:"uploaded_at"`
 }
 
@@ -38,6 +40,7 @@ func toImageResponse(img domain.Image) imageResponse {
 		FlipH:          img.FlipH,
 		FlipV:          img.FlipV,
 		Status:         string(img.Status),
+		Escalated:      img.Escalated,
 		UploadedAt:     img.UploadedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
@@ -64,6 +67,7 @@ func (h *ImageHandler) ImageRoutes() chi.Router {
 	r.Get("/{imageId}", h.get)
 	r.Get("/{imageId}/file", h.file)
 	r.Patch("/{imageId}", h.updateTransform)
+	r.Post("/{imageId}/workflow-transitions", h.applyWorkflowEvent)
 	r.Delete("/{imageId}", h.delete)
 	return r
 }
@@ -93,8 +97,26 @@ func (h *ImageHandler) upload(w http.ResponseWriter, r *http.Request) {
 
 func (h *ImageHandler) list(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "projectId")
-	images, err := h.uc.ListByProject(r.Context(), projectID)
+	filter := usecase.ImageListFilter{}
+	if statusValue := r.URL.Query().Get("status"); statusValue != "" {
+		status := domain.ImageStatus(statusValue)
+		filter.Status = &status
+	}
+	if escalatedValue := r.URL.Query().Get("escalated"); escalatedValue != "" {
+		escalated, err := strconv.ParseBool(escalatedValue)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid escalated filter")
+			return
+		}
+		filter.Escalated = &escalated
+	}
+
+	images, err := h.uc.ListByProjectFiltered(r.Context(), projectID, filter)
 	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidImageStatus) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -147,6 +169,9 @@ func (h *ImageHandler) updateTransform(w http.ResponseWriter, r *http.Request) {
 
 	img, err := h.uc.UpdateTransform(r.Context(), id, domain.Rotation(req.Rotation), req.FlipH, req.FlipV)
 	if err != nil {
+		if writeWorkflowOperationError(w, err) {
+			return
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "image not found")
 			return
