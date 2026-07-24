@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { Upload } from "lucide-react";
 import type { ImageMeta } from "../../types";
 import { useProjectStore } from "../../stores/projectStore";
 
@@ -24,13 +25,17 @@ export default function Sidebar({ images, currentImageId, onSelectImage }: Props
   };
 
   return (
-    <div className="w-56 border-r bg-white flex flex-col">
+    <div className="flex w-28 flex-shrink-0 flex-col border-r bg-white md:w-56">
       <div className="p-3 border-b">
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="w-full bg-blue-600 text-white py-1.5 rounded text-sm hover:bg-blue-700"
+          aria-label="Upload images"
+          title="Upload images"
+          className="flex w-full items-center justify-center gap-2 rounded bg-blue-600 py-1.5 text-sm text-white hover:bg-blue-700"
         >
-          Upload Images
+          <Upload aria-hidden="true" size={15} strokeWidth={1.75} />
+          <span className="hidden md:inline">Upload Images</span>
         </button>
         <input
           ref={fileInputRef}

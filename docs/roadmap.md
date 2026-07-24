@@ -23,12 +23,12 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 3 | Add edge annotation UI | [PR #6](https://github.com/daikichiba9511/goat-cv/pull/6), [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7), [PR #8](https://github.com/daikichiba9511/goat-cv/pull/8) | Added label-aware BBox presentation and Reading Order edge drawing, display, save, reload, and deletion |
 | 4 | Validate annotation coordinates | [PR #22](https://github.com/daikichiba9511/goat-cv/pull/22) | Added atomic API validation for normalized Bounding Box and Polygon coordinate schemas |
 | 5 | Save the image graph atomically | [PR #24](https://github.com/daikichiba9511/goat-cv/pull/24) | Added one transactional save contract for Annotations and Edges with explicit client ID mapping |
+| 6 | Add annotation inspector | [PR #26](https://github.com/daikichiba9511/goat-cv/pull/26) | Added synchronized Annotation listing, filtering, relationship counts, selection, and deletion outside the Canvas |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 6 | Add annotation inspector | [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) | Synchronized list and Canvas selection for annotations, labels, and relationships |
 | 7 | Add remaining edge relation UI | [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) | UI support for `key_value` and `table_cell` Edges without regressing `reading_order` |
 | 8 | Add polygon annotation UI | [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12) | Polygon drawing, vertex editing, deletion, save, and reload |
 | 9 | Add COCO and YOLO export | [Issue #14](https://github.com/daikichiba9511/goat-cv/issues/14) | Documented category rules and COCO/YOLO export for supported node annotations |
@@ -44,7 +44,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 ## Dependency Order
 
 - Completed [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) provides the annotation validation boundary used by completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13).
-- [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) is independent of the save-contract changes and follows the backend foundation work to improve object and label inspection before the remaining drawing tools are added.
+- Completed [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) provides object and label inspection before the remaining drawing tools are added.
 - Completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) provides the atomic save boundary required by [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12).
 - Issues [#15](https://github.com/daikichiba9511/goat-cv/issues/15), [#18](https://github.com/daikichiba9511/goat-cv/issues/18), and [#19](https://github.com/daikichiba9511/goat-cv/issues/19) are decision work. Each creates smaller implementation issues only after its behavior or architecture is explicit.
 
@@ -78,7 +78,7 @@ Work items:
 - Completed: Reading Order edge UI in [PR #7](https://github.com/daikichiba9511/goat-cv/pull/7)
 - Completed: Annotation coordinate validation in [PR #22](https://github.com/daikichiba9511/goat-cv/pull/22)
 - Completed: Atomic image graph save in [PR #24](https://github.com/daikichiba9511/goat-cv/pull/24)
-- [Issue #9: Add annotation inspector](https://github.com/daikichiba9511/goat-cv/issues/9)
+- Completed: Annotation Inspector in [PR #26](https://github.com/daikichiba9511/goat-cv/pull/26)
 - [Issue #10: Add remaining edge relation UI](https://github.com/daikichiba9511/goat-cv/issues/10)
 - [Issue #12: Add polygon annotation UI](https://github.com/daikichiba9511/goat-cv/issues/12)
 
@@ -166,4 +166,4 @@ Completion criteria:
 
 ## Current Product Baseline
 
-The `main` branch supports the single-user synchronous workflow: image upload, BBox drawing, save/load, label assignment, transform controls, GOAT JSON export, Edge APIs, and Reading Order edge editing.
+The `main` branch supports the single-user synchronous workflow: image upload, BBox drawing, save/load, label assignment, Annotation Inspector, transform controls, GOAT JSON export, Edge APIs, and Reading Order edge editing.

@@ -63,6 +63,9 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - Zoom/Pan は表示操作であり、保存座標には影響しない
 - 一括保存により、Image 単位の Annotation と Edge を1回の操作で置き換えられる
 - 保存に失敗した場合、編集中の Annotation と Edge を保持し、理由を表示して再試行できる
+- Annotation InspectorでLabel、図形種別、接続中のEdge数を一覧できる
+- Annotation InspectorはLabelと図形種別で表示を絞り込み、Canvasと選択状態を同期できる
+- Annotation InspectorからAnnotationを削除すると、接続中のEdgeもローカル編集状態から除去する
 
 ### Graph Annotation
 
