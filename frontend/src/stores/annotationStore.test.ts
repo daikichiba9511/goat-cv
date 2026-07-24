@@ -83,7 +83,7 @@ describe("annotationStore save", () => {
   it("saves the graph once and resolves IDs through client_id", async () => {
     vi.mocked(api.saveImageGraph).mockResolvedValue(savedGraph);
 
-    await useAnnotationStore.getState().save("image-1");
+    const saveSucceeded = await useAnnotationStore.getState().save("image-1");
 
     expect(api.saveImageGraph).toHaveBeenCalledTimes(1);
     expect(api.saveImageGraph).toHaveBeenCalledWith("image-1", {
@@ -122,6 +122,7 @@ describe("annotationStore save", () => {
     expect(state.dirty).toBe(false);
     expect(state.saving).toBe(false);
     expect(state.saveError).toBeNull();
+    expect(saveSucceeded).toBe(true);
   });
 
   it("keeps edits dirty after failure and allows a successful retry", async () => {
@@ -129,7 +130,7 @@ describe("annotationStore save", () => {
       .mockRejectedValueOnce(new Error("edge cardinality rule violation"))
       .mockResolvedValueOnce(savedGraph);
 
-    await useAnnotationStore.getState().save("image-1");
+    const saveSucceeded = await useAnnotationStore.getState().save("image-1");
 
     const failedState = useAnnotationStore.getState();
     expect(failedState.annotations).toEqual(initialAnnotations);
@@ -137,6 +138,7 @@ describe("annotationStore save", () => {
     expect(failedState.dirty).toBe(true);
     expect(failedState.saving).toBe(false);
     expect(failedState.saveError).toBe("edge cardinality rule violation");
+    expect(saveSucceeded).toBe(false);
 
     await failedState.save("image-1");
 

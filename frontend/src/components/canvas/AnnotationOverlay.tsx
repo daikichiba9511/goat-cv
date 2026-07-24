@@ -38,6 +38,7 @@ type Props = {
   scale: number;
   stageScale: number;
   compactLabels: boolean;
+  editable: boolean;
   onAnnotationClick: (annotationId: string) => void;
   onEdgeClick: (edgeId: string) => void;
   onBBoxCoordinatesChange: (
@@ -65,6 +66,7 @@ function AnnotationOverlay({
   scale,
   stageScale,
   compactLabels,
+  editable,
   onAnnotationClick,
   onEdgeClick,
   onBBoxCoordinatesChange,
@@ -198,7 +200,7 @@ function AnnotationOverlay({
                 shadowColor={isSelected || isEdgeSource ? color : undefined}
                 shadowBlur={isSelected || isEdgeSource ? 8 : 0}
                 listening={annotationShapesListen}
-                draggable={activeTool === "select"}
+                draggable={editable && activeTool === "select"}
                 onClick={(event) => {
                   event.cancelBubble = true;
                   onAnnotationClick(annotation.id);
@@ -230,7 +232,7 @@ function AnnotationOverlay({
                   color={color}
                   selected={isSelected}
                   edgeSource={isEdgeSource && activeTool === "edge"}
-                  editable={activeTool === "select"}
+                  editable={editable && activeTool === "select"}
                   listening={annotationShapesListen}
                   stageScale={stageScale}
                   imageDisplayWidth={imageWidth * scale}

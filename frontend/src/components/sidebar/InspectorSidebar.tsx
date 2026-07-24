@@ -14,6 +14,7 @@ type Props = {
   onSelectLabel: (labelId: string | null) => void;
   onSelectAnnotation: (annotationId: string) => void;
   currentImageId: string | null;
+  graphEditable: boolean;
 };
 
 type InspectorTab = "objects" | "labels" | "guidelines" | "comments";
@@ -25,6 +26,7 @@ export default function InspectorSidebar({
   onSelectLabel,
   onSelectAnnotation,
   currentImageId,
+  graphEditable,
 }: Props) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("objects");
   const [guidelinesLoaded, setGuidelinesLoaded] = useState(false);
@@ -149,7 +151,11 @@ export default function InspectorSidebar({
         role="tabpanel"
         className={!collapsed && activeTab === "objects" ? "min-h-0 flex-1" : "hidden"}
       >
-        <AnnotationInspector labels={labels} onSelectAnnotation={onSelectAnnotation} />
+        <AnnotationInspector
+          labels={labels}
+          onSelectAnnotation={onSelectAnnotation}
+          graphEditable={graphEditable}
+        />
       </div>
       <div
         id="comments-panel"
@@ -171,6 +177,7 @@ export default function InspectorSidebar({
           labels={labels}
           activeLabel={activeLabel}
           onSelectLabel={onSelectLabel}
+          graphEditable={graphEditable}
         />
       </div>
       <div
