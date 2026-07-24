@@ -78,7 +78,7 @@ export default function LabelPanel({ labels, activeLabel, onSelectLabel }: Props
   };
 
   return (
-    <div className="w-48 border-l bg-white flex flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       <div className="p-3 border-b flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">Labels</span>
         <button

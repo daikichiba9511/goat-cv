@@ -7,12 +7,12 @@ import type { ImageMeta, Tool } from "../types";
 import AnnotationCanvas from "../components/canvas/AnnotationCanvas";
 import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
-import LabelPanel from "../components/sidebar/LabelPanel";
+import InspectorSidebar from "../components/sidebar/InspectorSidebar";
 
 export default function Annotator() {
   const { projectId } = useParams<{ projectId: string }>();
   const { currentProject, selectProject, labels, images } = useProjectStore();
-  const { loadAnnotations, save, dirty, saving, saveError, clear } = useAnnotationStore();
+  const { loadAnnotations, save, dirty, saving, saveError, select, clear } = useAnnotationStore();
   const [currentImage, setCurrentImage] = useState<ImageMeta | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -39,6 +39,12 @@ export default function Annotator() {
     if (currentImage) {
       await save(currentImage.id);
     }
+  };
+
+  const handleSelectAnnotation = (annotationId: string) => {
+    // Why: Inspector選択時はSelect toolへ戻し、Canvas上の選択枠と編集Handleを同時に表示する。
+    setActiveTool("select");
+    select(annotationId);
   };
 
   const handleRotate = async () => {
@@ -71,14 +77,14 @@ export default function Annotator() {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen w-full overflow-hidden">
       <Sidebar
         images={images}
         currentImageId={currentImage?.id ?? null}
         onSelectImage={handleSelectImage}
       />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Toolbar
           activeTool={activeTool}
           onToolChange={setActiveTool}
@@ -109,10 +115,11 @@ export default function Annotator() {
         </div>
       </div>
 
-      <LabelPanel
+      <InspectorSidebar
         labels={labels}
         activeLabel={activeLabel}
         onSelectLabel={setActiveLabel}
+        onSelectAnnotation={handleSelectAnnotation}
       />
     </div>
   );

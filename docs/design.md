@@ -252,6 +252,24 @@ stateDiagram-v2
 - 未定義イベントは状態を変更しない。broadcastするイベントはない
 - Polygon自己交差、複数Image Transaction、共同編集の競合解決はこの保存状態に含めない
 
+### Annotation Inspector
+
+右側のInspector railは`Objects`と`Labels`を切り替え、`md`以上ではCanvasを覆わない固定幅の領域として配置する。
+狭いViewportでは初期状態を閉じ、開いた間だけ右側のdrawerとして表示する。
+`Objects`は現在のImageに属するAnnotationをLabel、図形種別、接続中のEdge数とともに表示し、Labelと図形種別で表示だけを絞り込む。
+
+| Event | Behavior |
+|-------|----------|
+| Inspectorの行を選択 | Select toolへ切り替え、同じAnnotation IDをCanvasの選択状態にする |
+| Canvasの図形を選択 | `Objects`を開き、対応行を選択して`scrollIntoView({ block: "nearest" })`で表示範囲へ移動する |
+| Canvas選択がFilter対象外 | Filterを変更せず、選択行だけをFilter結果の先頭へ追加表示する |
+| Filter変更 | 表示行だけを変更し、AnnotationとEdgeのstateは変更しない |
+| Inspectorから削除 | Annotationと接続中のEdgeをローカルstateから除去し、Graphを未保存状態にする |
+| Inspectorを閉じる | railを40pxへ縮め、Canvasの表示幅を確保する。次のCanvas選択時は再度開く |
+
+2026-07-24のローカル計測では、300 Annotationを持つImageの選択から300行目が操作可能になるまで484msであり、一覧の独立スクロールと末尾行の選択が機能した。
+この規模では通常のDOM一覧で操作可能なため、仮想スクロールは導入しない。
+
 ### Task-to-Model Mapping
 
 | Task | Annotationの使い方 | Edgeの使い方 | Label category |
@@ -271,18 +289,18 @@ stateDiagram-v2
 │          │                                      │                   │
 │ Sidebar  │         Canvas (Konva)               │  Right Panel      │
 │          │                                      │                   │
-│ ・Image  │   ┌─────────────────────────┐        │ [Tab: Labels]     │
-│   List   │   │                         │        │  ・label list     │
-│          │   │   Image                 │        │  ・assign label   │
+│ ・Image  │   ┌─────────────────────────┐        │ [Tab: Objects]    │
+│   List   │   │                         │        │  ・annotation list│
+│          │   │   Image                 │        │  ・filter/select  │
 │ ・Filter │   │   + Annotations         │        │                   │
-│  by      │   │   + Edges               │        │ [Tab: Guideline]  │
-│  status  │   │                         │        │  ・manual viewer  │
-│          │   └─────────────────────────┘        │  (Markdown)       │
+│  by      │   │   + Edges               │        │ [Tab: Labels]     │
+│  status  │   │                         │        │  ・label list     │
+│          │   └─────────────────────────┘        │  ・assign label   │
 │          │                                      │                   │
-│          │  Toolbar: BBox / Polygon / Edge /    │ [Tab: Comments]   │
-│          │           Select / Pan               │  ・QA feedback    │
-│          │                                      │  ・Escalation     │
-│          │                                      │  ・thread形式     │
+│          │  Toolbar: BBox / Polygon / Edge /    │ [Future tabs]     │
+│          │           Select / Pan               │  ・Guideline      │
+│          │                                      │  ・Comments       │
+│          │                                      │                   │
 └──────────┴──────────────────────────────────────┴───────────────────┘
 ```
 
@@ -345,11 +363,11 @@ goat-cv/
 │   │   │   │   ├── PolygonTool.tsx
 │   │   │   │   └── EdgeTool.tsx
 │   │   │   ├── sidebar/
-│   │   │   ├── toolbar/
-│   │   │   └── right-panel/
-│   │   │       ├── LabelPanel.tsx
-│   │   │       ├── GuidelinePanel.tsx
-│   │   │       └── CommentPanel.tsx
+│   │   │   │   ├── Sidebar.tsx
+│   │   │   │   ├── InspectorSidebar.tsx
+│   │   │   │   ├── AnnotationInspector.tsx
+│   │   │   │   └── LabelPanel.tsx
+│   │   │   └── toolbar/
 │   │   ├── stores/
 │   │   │   ├── annotationStore.ts
 │   │   │   └── projectStore.ts
