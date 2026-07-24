@@ -96,7 +96,12 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - Guideline は `display_order`、`title`、Guideline IDの順に表示し、同順位でも順序を安定させる
 - AnnotatorのGuideline panelを開閉しても、Canvasの選択中Annotationと未保存の編集状態を維持する
 - Guidelineのraw HTMLと埋め込み画像は描画せず、Markdownからscriptを実行できないようにする
-- Image または Annotation に Comment を作成し、解決済みにできる
+- Image全体または永続化済みAnnotationにCommentを作成し、削除できる
+- Commentは`question`、`issue`、`note`のtype、Markdown形式のbody、author、resolvedを持つ
+- Commentのresolvedは解決済みと未解決の間で相互に変更できる
+- Annotationを選択した場合は、そのAnnotationに属するCommentをComments panelへ表示する
+- Annotationを削除した場合は属するCommentも削除し、同じAnnotation IDの編集とgraph保存では保持する
+- Commentのraw HTMLと埋め込み画像は描画せず、Markdownからscriptを実行できないようにする
 
 ### Export
 

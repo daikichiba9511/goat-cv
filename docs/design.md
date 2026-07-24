@@ -114,7 +114,7 @@ Project 1 ---* Image 1 ---* Annotation
                                   ├─ id
                                   ├─ author
                                   ├─ body (Markdown)
-                                  ├─ type: "qa_feedback" | "escalation"
+                                  ├─ type: "question" | "issue" | "note"
                                   ├─ annotation_id (nullable, 特定Annotationへの指摘)
                                   ├─ resolved: bool
                                   └─ created_at
@@ -146,7 +146,7 @@ Project 1 ---* Image 1 ---* Annotation
 - **Edge** — Annotation間の有向関係（辺）。typeによって関係の意味が変わる
 - **LabelDefinition** — プロジェクト単位で定義するラベル体系。categoryでタスク種別を区別
 - **Guideline** — プロジェクト単位のアノテーションマニュアル。Markdown形式、複数ページ構成
-- **Comment** — Image/Annotationに対するQAフィードバックやエスカレーション
+- **Comment** — Image全体または特定Annotationに対するQAフィードバック
 
 Image単位でAnnotation(ノード) + Edge(辺) の有向グラフを構成する。
 
@@ -340,7 +340,7 @@ stateDiagram-v2
 │          │                                      │                   │
 │          │  Toolbar: BBox / Polygon / Edge /    │ [Tab: Guidelines] │
 │          │           Select / Pan               │  ・view / manage  │
-│          │                                      │ [Future: Comments]│
+│          │                                      │ [Tab: Comments]   │
 │          │                                      │                   │
 └──────────┴──────────────────────────────────────┴───────────────────┘
 ```
@@ -349,13 +349,20 @@ stateDiagram-v2
 
 - **アノテーション作業中にマニュアル参照**: Right PanelのGuidelineタブで即座に確認。Canvas作業を中断しない
 - **QAフィードバック確認**: Right PanelのCommentsタブ。特定Annotationへの指摘はクリックでCanvasにハイライト
-- **エスカレーション起票**: Commentsタブから起票。画像/特定Annotationにピン留め可能
+- **QA Comment作成**: Commentsタブから`question`、`issue`、`note`をImage全体または特定Annotationへ記録
 - **ステータスフィルタ**: Sidebarで`pending` / `rejected`等でフィルタし、作業対象を素早く特定
 - **レビュー画面**: 同じAnnotator画面を使い、reviewer権限でapprove/rejectボタンを表示
 
 Guideline panelはProjectに属するページを`display_order`、`title`、Guideline IDの順で表示する。
 閲覧、追加、編集、削除はRight Panel内で完結し、tab切替やpanel開閉でCanvasを再mountしない。
 Markdown rendererはraw HTMLを解釈せず、画像構文を画像要素へ変換しない。
+
+Comments panelはImage全体と選択中Annotationの表示対象を切り替える。
+CanvasまたはObjects tabで永続化済みAnnotationを選択した場合は、そのAnnotationのCommentを表示対象にする。
+未保存AnnotationにはCommentを作成できず、保存後に発行されたAnnotation IDを対象とする。
+Comment本文はGuidelineと同じ安全なMarkdown rendererで表示する。
+Annotationを削除した場合は、そのAnnotationに属するCommentも削除する。
+ただし、同じAnnotation IDを保つ座標変更やgraph保存ではCommentを保持する。
 
 ## Directory Structure
 

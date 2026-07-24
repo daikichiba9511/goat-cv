@@ -100,6 +100,7 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
   "name": "Invoice Annotation 2026Q1",
   "created_at": "2026-03-23T12:00:00Z"
 }
+
 ```
 
 ### Label Definitions
@@ -423,15 +424,16 @@ Validation and transaction rules:
 |--------|------|-------------|-------|
 | `POST` | `/images/:imageId/comments` | コメント作成 | 4 |
 | `GET` | `/images/:imageId/comments` | コメント一覧 | 4 |
-| `PATCH` | `/comments/:commentId` | コメント更新 (resolve等) | 4 |
-| `DELETE` | `/comments/:commentId` | コメント削除 | 4 |
+| `PATCH` | `/images/:imageId/comments/:commentId` | 解決状態の更新 | 4 |
+| `DELETE` | `/images/:imageId/comments/:commentId` | コメント削除 | 4 |
 
 ```jsonc
 // POST /images/:imageId/comments
 // Request
 {
+  "author": "reviewer-1",
   "body": "This bbox should include the header margin",
-  "type": "qa_feedback",
+  "type": "issue",
   "annotation_id": "0194..."
 }
 
@@ -440,13 +442,30 @@ Validation and transaction rules:
   "id": "0194...",
   "author": "reviewer-1",
   "body": "This bbox should include the header margin",
-  "type": "qa_feedback",
+  "type": "issue",
   "annotation_id": "0194...",
   "image_id": "0194...",
   "resolved": false,
   "created_at": "2026-03-23T12:00:00Z"
 }
+
+// PATCH /images/:imageId/comments/:commentId
+// Request
+{
+  "resolved": true
+}
 ```
+
+`annotation_id`は省略または`null`の場合にImage全体を対象とし、指定した場合は同じImageに属する永続化済みAnnotationを対象とする。
+存在しないAnnotation、別Imageまたは別ProjectのAnnotationを指定した場合は`404 Not Found`を返す。
+`author`は認証連携前の表示名として前後の空白を除いた1文字以上を必須とし、作成後は変更しない。
+`body`は空白だけの値を拒否し、Markdown原文を保存する。
+`type`は`question`、`issue`、`note`のいずれかを必須とする。
+`resolved`は作成時に`false`となり、`PATCH`ではbooleanの`resolved`だけを必須とする。
+一覧は`created_at`、Comment IDの順で返し、CommentがないImageでは`items: []`を返す。
+更新と削除では、Comment IDが存在しない場合と指定Imageに属さない場合のどちらも`404 Not Found`を返す。
+Annotationを削除した場合は属するCommentも削除するが、同じAnnotation IDを保つ更新とgraph保存ではCommentを保持する。
+Comment本文の表示ではraw HTMLと埋め込み画像を描画しない。
 
 ### Export
 
