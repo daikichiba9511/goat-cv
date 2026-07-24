@@ -135,7 +135,7 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - BBox は有限値の `x`、`y`、`width`、`height` を必須とし、正の面積を持つ矩形全体が `0.0` から `1.0` に収まるものだけを保存する
 - Polygon は有限値の `x`、`y` を持つ相異なる点を3個以上必須とし、各点が `0.0` から `1.0` に収まるものだけを保存する
 - 一括保存に不正な Annotation が1件でも含まれる場合、API はリクエスト全体を拒否し、既存 Annotation を変更しない
-- 回転・反転の適用順は `rotation -> flip_h -> flip_v` とする
+- 表示行列は原画像の中心を基準に `flip_h -> flip_v -> rotation` の順で合成する
 - 回転・反転を変更した後の既存 Annotation は原則として再確認が必要である
 - API は JSON を基本とし、画像アップロードのみ `multipart/form-data` を使う
 

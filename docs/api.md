@@ -476,6 +476,7 @@ YOLOで対象外となるPolygonと`object`以外のAnnotationは`manifest.json`
 
 COCO/YOLOはノード（Annotation）のみ対応する。
 エッジ（Reading Order、KV等）のグラフ構造を収録しないことは、各ZIPの`manifest.json`へ機械可読な値として記録する。
+`manifest.json`の`images`はImage ID、元ファイル名、ZIP内path、原画像サイズ、rotation、flipを保持し、ID化した画像名から元のImage情報を復元できるようにする。
 
 #### COCO ZIP
 
@@ -503,6 +504,7 @@ project-yolo.zip/
 
 YOLOの各行は`class_id center_x center_y width height`であり、座標は原画像空間の0から1までの正規化値とする。
 Annotationのない画像にも空のLabel fileを作成し、画像とAnnotation fileを1対1で対応させる。
+Project全体を`train`へ配置し、train/validationの自動分割は行わない。
 
 #### GOAT JSON Format
 

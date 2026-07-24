@@ -13,7 +13,7 @@ Phase 1 is implemented as a single-user, synchronous annotation workflow:
 - BBox annotation on images
 - Annotation save/load through the REST API
 - Zoom, pan, rotate, and flip controls
-- GOAT JSON export
+- GOAT JSON, COCO, and YOLO export
 
 ## Tech Stack
 

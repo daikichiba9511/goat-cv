@@ -64,6 +64,13 @@ func main() {
 	annotationUC := usecase.NewAnnotationUsecase(annotationRepo)
 	edgeUC := usecase.NewEdgeUsecase(edgeRepo, annotationRepo, labelRepo)
 	imageGraphUC := usecase.NewImageGraphUsecase(imageGraphRepo, labelRepo)
+	datasetExportUC := usecase.NewDatasetExportUsecase(
+		projectRepo,
+		imageRepo,
+		annotationRepo,
+		labelRepo,
+		storagePath,
+	)
 
 	// Handlers
 	projectHandler := handler.NewProjectHandler(projectUC)
@@ -72,7 +79,14 @@ func main() {
 	annotationHandler := handler.NewAnnotationHandler(annotationUC)
 	edgeHandler := handler.NewEdgeHandler(edgeUC)
 	imageGraphHandler := handler.NewImageGraphHandler(imageGraphUC)
-	exportHandler := handler.NewExportHandler(projectUC, imageUC, annotationUC, labelUC)
+	exportHandler := handler.NewExportHandler(
+		projectUC,
+		imageUC,
+		annotationUC,
+		labelUC,
+		edgeUC,
+		datasetExportUC,
+	)
 
 	// Routes
 	r.Get("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
