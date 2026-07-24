@@ -11,6 +11,8 @@ import type {
   BBoxCoordinates,
   Edge,
   LabelDefinition,
+  NormalizedPoint,
+  PolygonCoordinates,
   Tool,
 } from "../../types";
 import { categoryLabel, EDGE_RELATIONS } from "../../edgeRelations";
@@ -19,7 +21,9 @@ import {
   directedEdgePoints,
   readableTextColor,
   toDisplayBBox,
+  toDisplayPolygon,
 } from "./annotationGeometry";
+import PolygonAnnotationShape from "./PolygonAnnotationShape";
 
 type Props = {
   annotations: Annotation[];
@@ -32,10 +36,19 @@ type Props = {
   imageWidth: number;
   imageHeight: number;
   scale: number;
+  stageScale: number;
   compactLabels: boolean;
   onAnnotationClick: (annotationId: string) => void;
   onEdgeClick: (edgeId: string) => void;
-  onCoordinatesChange: (annotationId: string, coordinates: BBoxCoordinates) => void;
+  onBBoxCoordinatesChange: (
+    annotationId: string,
+    coordinates: BBoxCoordinates,
+  ) => void;
+  onPolygonPointChange: (
+    annotationId: string,
+    pointIndex: number,
+    point: NormalizedPoint,
+  ) => void;
   layerToNormalized: (x: number, y: number) => [number, number];
 };
 
@@ -50,10 +63,12 @@ function AnnotationOverlay({
   imageWidth,
   imageHeight,
   scale,
+  stageScale,
   compactLabels,
   onAnnotationClick,
   onEdgeClick,
-  onCoordinatesChange,
+  onBBoxCoordinatesChange,
+  onPolygonPointChange,
   layerToNormalized,
 }: Props) {
   const labelById = useMemo(
@@ -76,10 +91,33 @@ function AnnotationOverlay({
     }
     return boxes;
   }, [annotations, imageWidth, imageHeight, scale]);
+  const displayPolygonByAnnotationId = useMemo(() => {
+    const polygons = new Map<string, ReturnType<typeof toDisplayPolygon>>();
+    for (const annotation of annotations) {
+      if (annotation.type !== "polygon") continue;
+      polygons.set(
+        annotation.id,
+        toDisplayPolygon(
+          annotation.coordinates as PolygonCoordinates,
+          imageWidth,
+          imageHeight,
+          scale,
+        ),
+      );
+    }
+    return polygons;
+  }, [annotations, imageWidth, imageHeight, scale]);
+  const displayBoundsByAnnotationId = useMemo(() => {
+    const bounds = new Map(displayBBoxByAnnotationId);
+    for (const [annotationId, polygon] of displayPolygonByAnnotationId) {
+      bounds.set(annotationId, polygon.bounds);
+    }
+    return bounds;
+  }, [displayBBoxByAnnotationId, displayPolygonByAnnotationId]);
   const displayedEdges = useMemo(() => {
     return edges.flatMap((edge) => {
-      const sourceBox = displayBBoxByAnnotationId.get(edge.source_annotation_id);
-      const targetBox = displayBBoxByAnnotationId.get(edge.target_annotation_id);
+      const sourceBox = displayBoundsByAnnotationId.get(edge.source_annotation_id);
+      const targetBox = displayBoundsByAnnotationId.get(edge.target_annotation_id);
       if (!sourceBox || !targetBox) return [];
 
       const points = directedEdgePoints(sourceBox, targetBox);
@@ -91,7 +129,8 @@ function AnnotationOverlay({
         labelY: (points[1] + points[3]) / 2,
       }];
     });
-  }, [edges, displayBBoxByAnnotationId]);
+  }, [edges, displayBoundsByAnnotationId]);
+  const annotationShapesListen = activeTool !== "bbox" && activeTool !== "polygon";
 
   return (
     <>
@@ -111,6 +150,7 @@ function AnnotationOverlay({
             opacity={isSelected ? 1 : 0.9}
             shadowColor={isSelected ? relation.color : undefined}
             shadowBlur={isSelected ? 8 : 0}
+            listening={annotationShapesListen}
             onClick={(event) => {
               event.cancelBubble = true;
               onEdgeClick(edge.id);
@@ -120,10 +160,9 @@ function AnnotationOverlay({
       })}
 
       {annotations.map((annotation) => {
-        if (annotation.type !== "bbox") return null;
-        const coordinates = annotation.coordinates as BBoxCoordinates;
-        const displayBox = displayBBoxByAnnotationId.get(annotation.id);
-        if (!displayBox) return null;
+        const displayBox = displayBoundsByAnnotationId.get(annotation.id);
+        const displayPolygon = displayPolygonByAnnotationId.get(annotation.id);
+        if (!displayBox || (annotation.type === "polygon" && !displayPolygon)) return null;
 
         const label = annotation.label_id
           ? labelById.get(annotation.label_id)
@@ -145,41 +184,62 @@ function AnnotationOverlay({
 
         return (
           <Fragment key={annotation.id}>
-            <Rect
-              id={annotation.id}
-              x={displayBox.x}
-              y={displayBox.y}
-              width={displayBox.width}
-              height={displayBox.height}
-              stroke={color}
-              strokeWidth={isSelected || isEdgeSource ? 3 : 2}
-              fill={`${color}20`}
-              dash={isEdgeSource && activeTool === "edge" ? [6, 3] : undefined}
-              shadowColor={isSelected || isEdgeSource ? color : undefined}
-              shadowBlur={isSelected || isEdgeSource ? 8 : 0}
-              draggable={activeTool === "select"}
-              onClick={(event) => {
-                event.cancelBubble = true;
-                onAnnotationClick(annotation.id);
-              }}
-              onDragEnd={(event) => {
-                const node = event.target;
-                const [x, y] = layerToNormalized(node.x(), node.y());
-                onCoordinatesChange(annotation.id, { ...coordinates, x, y });
-              }}
-              onTransformEnd={(event) => {
-                const node = event.target;
-                const scaleX = node.scaleX();
-                const scaleY = node.scaleY();
-                // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
-                node.scaleX(1);
-                node.scaleY(1);
-                const [x, y] = layerToNormalized(node.x(), node.y());
-                const [width] = layerToNormalized(node.width() * scaleX, 0);
-                const [, height] = layerToNormalized(0, node.height() * scaleY);
-                onCoordinatesChange(annotation.id, { x, y, width, height });
-              }}
-            />
+            {annotation.type === "bbox" ? (
+              <Rect
+                id={annotation.id}
+                x={displayBox.x}
+                y={displayBox.y}
+                width={displayBox.width}
+                height={displayBox.height}
+                stroke={color}
+                strokeWidth={isSelected || isEdgeSource ? 3 : 2}
+                fill={`${color}20`}
+                dash={isEdgeSource && activeTool === "edge" ? [6, 3] : undefined}
+                shadowColor={isSelected || isEdgeSource ? color : undefined}
+                shadowBlur={isSelected || isEdgeSource ? 8 : 0}
+                listening={annotationShapesListen}
+                draggable={activeTool === "select"}
+                onClick={(event) => {
+                  event.cancelBubble = true;
+                  onAnnotationClick(annotation.id);
+                }}
+                onDragEnd={(event) => {
+                  const coordinates = annotation.coordinates as BBoxCoordinates;
+                  const node = event.target;
+                  const [x, y] = layerToNormalized(node.x(), node.y());
+                  onBBoxCoordinatesChange(annotation.id, { ...coordinates, x, y });
+                }}
+                onTransformEnd={(event) => {
+                  const node = event.target;
+                  const scaleX = node.scaleX();
+                  const scaleY = node.scaleY();
+                  // Why: Konva Transformerはwidth/heightではなくscaleを変えるため、保存前に実寸へ畳み込む。
+                  node.scaleX(1);
+                  node.scaleY(1);
+                  const [x, y] = layerToNormalized(node.x(), node.y());
+                  const [width] = layerToNormalized(node.width() * scaleX, 0);
+                  const [, height] = layerToNormalized(0, node.height() * scaleY);
+                  onBBoxCoordinatesChange(annotation.id, { x, y, width, height });
+                }}
+              />
+            ) : (
+              displayPolygon && (
+                <PolygonAnnotationShape
+                  annotationId={annotation.id}
+                  displayPolygon={displayPolygon}
+                  color={color}
+                  selected={isSelected}
+                  edgeSource={isEdgeSource && activeTool === "edge"}
+                  editable={activeTool === "select"}
+                  listening={annotationShapesListen}
+                  stageScale={stageScale}
+                  imageDisplayWidth={imageWidth * scale}
+                  imageDisplayHeight={imageHeight * scale}
+                  onClick={onAnnotationClick}
+                  onPointChange={onPolygonPointChange}
+                />
+              )
+            )}
             <KonvaLabel
               x={displayBox.x}
               y={labelY}
@@ -219,6 +279,7 @@ function AnnotationOverlay({
             offsetX={(relation.canvasLabel.length * 6 + 8) / 2}
             offsetY={compactLabels ? -4 : 10}
             opacity={isSelected ? 1 : 0.92}
+            listening={annotationShapesListen}
             onClick={(event) => {
               event.cancelBubble = true;
               onEdgeClick(edge.id);

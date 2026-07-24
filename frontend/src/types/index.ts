@@ -1,4 +1,4 @@
-export type Tool = "select" | "bbox" | "edge" | "pan";
+export type Tool = "select" | "bbox" | "polygon" | "edge" | "pan";
 
 export type Project = {
   id: string;
@@ -52,8 +52,13 @@ export type BBoxCoordinates = {
   height: number;
 };
 
+export type NormalizedPoint = {
+  x: number;
+  y: number;
+};
+
 export type PolygonCoordinates = {
-  points: { x: number; y: number }[];
+  points: NormalizedPoint[];
 };
 
 export type Annotation = {

@@ -1,4 +1,4 @@
-import type { BBoxCoordinates } from "../../types";
+import type { BBoxCoordinates, PolygonCoordinates } from "../../types";
 
 export type DisplayBBox = {
   x: number;
@@ -7,6 +7,11 @@ export type DisplayBBox = {
   height: number;
   centerX: number;
   centerY: number;
+};
+
+export type DisplayPolygon = {
+  points: number[];
+  bounds: DisplayBBox;
 };
 
 export function toDisplayBBox(
@@ -35,6 +40,41 @@ export function normalizeBBox(coordinates: BBoxCoordinates): BBoxCoordinates {
     y: coordinates.height < 0 ? coordinates.y + coordinates.height : coordinates.y,
     width: Math.abs(coordinates.width),
     height: Math.abs(coordinates.height),
+  };
+}
+
+export function toDisplayPolygon(
+  coordinates: PolygonCoordinates,
+  imageWidth: number,
+  imageHeight: number,
+  scale: number,
+): DisplayPolygon {
+  const points: number[] = [];
+  let minimumX = Number.POSITIVE_INFINITY;
+  let maximumX = Number.NEGATIVE_INFINITY;
+  let minimumY = Number.POSITIVE_INFINITY;
+  let maximumY = Number.NEGATIVE_INFINITY;
+  for (const point of coordinates.points) {
+    const displayX = point.x * imageWidth * scale;
+    const displayY = point.y * imageHeight * scale;
+    points.push(displayX, displayY);
+    minimumX = Math.min(minimumX, displayX);
+    maximumX = Math.max(maximumX, displayX);
+    minimumY = Math.min(minimumY, displayY);
+    maximumY = Math.max(maximumY, displayY);
+  }
+  const width = maximumX - minimumX;
+  const height = maximumY - minimumY;
+  return {
+    points,
+    bounds: {
+      x: minimumX,
+      y: minimumY,
+      width,
+      height,
+      centerX: minimumX + width / 2,
+      centerY: minimumY + height / 2,
+    },
   };
 }
 

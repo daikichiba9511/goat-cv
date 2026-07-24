@@ -29,6 +29,7 @@ type Props = {
 const tools: { key: Tool; label: string }[] = [
   { key: "select", label: "Select" },
   { key: "bbox", label: "BBox" },
+  { key: "polygon", label: "Polygon" },
   { key: "edge", label: "Edge" },
   { key: "pan", label: "Pan" },
 ];

@@ -8,6 +8,7 @@ import AnnotationCanvas from "../components/canvas/AnnotationCanvas";
 import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
 import EdgeToolPanel from "../components/toolbar/EdgeToolPanel";
+import PolygonToolPanel from "../components/toolbar/PolygonToolPanel";
 import InspectorSidebar from "../components/sidebar/InspectorSidebar";
 
 export default function Annotator() {
@@ -22,6 +23,7 @@ export default function Annotator() {
     select,
     clear,
     cancelEdgeDraft,
+    cancelPolygonDraft,
   } = useAnnotationStore();
   const [currentImage, setCurrentImage] = useState<ImageMeta | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>("select");
@@ -42,6 +44,7 @@ export default function Annotator() {
   }, [currentImage, loadAnnotations, clear]);
 
   const handleSelectImage = (img: ImageMeta) => {
+    cancelPolygonDraft();
     setCurrentImage(img);
   };
 
@@ -55,6 +58,10 @@ export default function Annotator() {
     if (tool !== "edge") {
       // Why: Edge toolを離れた後のクリックで、非表示の始点からEdgeが作られないようにする。
       cancelEdgeDraft();
+    }
+    if (tool !== "polygon") {
+      // Why: 非表示になった作成途中の輪郭が、後で誤って確定されないようにする。
+      cancelPolygonDraft();
     }
     setActiveTool(tool);
   };
@@ -119,6 +126,9 @@ export default function Annotator() {
         />
 
         {activeTool === "edge" && currentImage && <EdgeToolPanel />}
+        {activeTool === "polygon" && currentImage && (
+          <PolygonToolPanel imageId={currentImage.id} activeLabelId={activeLabel} />
+        )}
 
         <div className="flex-1 relative overflow-hidden bg-gray-200">
           {currentImage ? (

@@ -59,6 +59,10 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 - BBox Annotation を作成、選択、移動、リサイズ、削除できる
 - Polygon Annotation を作成、選択、編集、削除できる
+- Polygonは3個以上の頂点で確定し、確定前は輪郭と頂点をプレビューする
+- 3個未満の頂点ではPolygonを確定できず、Cancelした作成途中の頂点は保存対象に含めない
+- 選択したPolygonは頂点handleを表示し、各頂点を画像範囲内かつ他の頂点と重ならない位置へ移動できる
+- Polygonの頂点順序と選択中のLabelは保存と再読込の後も維持する
 - Annotation は正規化座標で保存する
 - Zoom/Pan は表示操作であり、保存座標には影響しない
 - 一括保存により、Image 単位の Annotation と Edge を1回の操作で置き換えられる

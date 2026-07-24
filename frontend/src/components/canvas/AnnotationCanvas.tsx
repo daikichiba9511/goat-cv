@@ -8,11 +8,12 @@ import {
 } from "react-konva";
 import type Konva from "konva";
 import { useShallow } from "zustand/react/shallow";
-import type { ImageMeta, Tool } from "../../types";
+import type { ImageMeta, NormalizedPoint, Tool } from "../../types";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { imageFileUrl } from "../../api/client";
 import AnnotationOverlay from "./AnnotationOverlay";
+import PolygonDraftOverlay from "./PolygonDraftOverlay";
 import { normalizeBBox } from "./annotationGeometry";
 
 type Props = {
@@ -31,6 +32,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
+  const [polygonCursor, setPolygonCursor] = useState<NormalizedPoint | null>(null);
 
   const {
     annotations,
@@ -38,12 +40,18 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     selectedId,
     selectedEdgeId,
     edgeSourceId,
+    polygonDraftPoints,
     select,
     selectEdge,
     connectEdge,
     cancelEdgeDraft,
+    addPolygonDraftPoint,
+    undoPolygonDraftPoint,
+    cancelPolygonDraft,
+    finishPolygon,
     addBBox,
-    updateCoordinates,
+    updateBBoxCoordinates,
+    updatePolygonPoint,
     remove,
     removeEdge,
   } = useAnnotationStore(useShallow((state) => ({
@@ -52,12 +60,18 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     selectedId: state.selectedId,
     selectedEdgeId: state.selectedEdgeId,
     edgeSourceId: state.edgeSourceId,
+    polygonDraftPoints: state.polygonDraftPoints,
     select: state.select,
     selectEdge: state.selectEdge,
     connectEdge: state.connectEdge,
     cancelEdgeDraft: state.cancelEdgeDraft,
+    addPolygonDraftPoint: state.addPolygonDraftPoint,
+    undoPolygonDraftPoint: state.undoPolygonDraftPoint,
+    cancelPolygonDraft: state.cancelPolygonDraft,
+    finishPolygon: state.finishPolygon,
     addBBox: state.addBBox,
-    updateCoordinates: state.updateCoordinates,
+    updateBBoxCoordinates: state.updateBBoxCoordinates,
+    updatePolygonPoint: state.updatePolygonPoint,
     remove: state.remove,
     removeEdge: state.removeEdge,
   })));
@@ -94,8 +108,11 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     const stage = stageRef.current;
     if (!transformer || !stage) return;
 
-    if (selectedId && activeTool === "select") {
-      const node = stage.findOne(`#${CSS.escape(selectedId)}`);
+    const selectedAnnotation = annotations.find(
+      (annotation) => annotation.id === selectedId,
+    );
+    if (selectedAnnotation?.type === "bbox" && activeTool === "select") {
+      const node = stage.findOne(`#${CSS.escape(selectedAnnotation.id)}`);
       if (node) {
         transformer.nodes([node]);
         transformer.getLayer()?.batchDraw();
@@ -123,6 +140,10 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     },
     [image.width, image.height, scale],
   );
+
+  const normalizedPointInImage = useCallback((point: NormalizedPoint) => {
+    return point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1;
+  }, []);
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -174,6 +195,15 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   };
 
   const handleMouseMove = () => {
+    if (activeTool === "polygon") {
+      const position = stageRef.current?.getPointerPosition();
+      if (!position) return;
+      const [x, y] = screenToNormalized(position.x, position.y);
+      const point = { x, y };
+      setPolygonCursor(normalizedPointInImage(point) ? point : null);
+      return;
+    }
+
     const drawingStart = drawingStartRef.current;
     if (!drawingStart || activeTool !== "bbox") return;
     const stage = stageRef.current;
@@ -222,18 +252,58 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool === "select" && (e.target === stageRef.current || e.target.getClassName() === "Image")) {
+    const clickedCanvasBackground = e.target === stageRef.current
+      || e.target.getClassName() === "Image";
+    if (activeTool === "select" && clickedCanvasBackground) {
       select(null);
     }
-    if (activeTool === "edge" && (e.target === stageRef.current || e.target.getClassName() === "Image")) {
+    if (activeTool === "edge" && clickedCanvasBackground) {
       cancelEdgeDraft();
       selectEdge(null);
+    }
+    if (activeTool === "polygon" && clickedCanvasBackground) {
+      const position = stageRef.current?.getPointerPosition();
+      if (!position) return;
+      const [x, y] = screenToNormalized(position.x, position.y);
+      const point = { x, y };
+      if (normalizedPointInImage(point)) {
+        addPolygonDraftPoint(point);
+        select(null);
+      }
     }
   };
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if ((e.key !== "Delete" && e.key !== "Backspace")) return;
+      const target = e.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable
+        || target.tagName === "INPUT"
+        || target.tagName === "TEXTAREA"
+        || target.tagName === "SELECT"
+      )) {
+        return;
+      }
+
+      if (activeTool === "polygon") {
+        if (e.key === "Escape" && polygonDraftPoints.length > 0) {
+          e.preventDefault();
+          cancelPolygonDraft();
+          return;
+        }
+        if (e.key === "Backspace" && polygonDraftPoints.length > 0) {
+          e.preventDefault();
+          undoPolygonDraftPoint();
+          return;
+        }
+        if (e.key === "Enter" && polygonDraftPoints.length >= 3) {
+          e.preventDefault();
+          finishPolygon(image.id, activeLabel);
+          return;
+        }
+      }
+
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
       if (selectedEdgeId) {
         removeEdge(selectedEdgeId);
         return;
@@ -242,7 +312,19 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
         remove(selectedId);
       }
     },
-    [selectedId, selectedEdgeId, remove, removeEdge],
+    [
+      activeLabel,
+      activeTool,
+      cancelPolygonDraft,
+      finishPolygon,
+      image.id,
+      polygonDraftPoints.length,
+      remove,
+      removeEdge,
+      selectedEdgeId,
+      selectedId,
+      undoPolygonDraftPoint,
+    ],
   );
 
   useEffect(() => {
@@ -285,7 +367,8 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             setStagePos({ x: e.target.x(), y: e.target.y() });
           }
         }}
-        style={{ cursor: activeTool === "bbox" || activeTool === "edge" ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
+        onMouseLeave={() => setPolygonCursor(null)}
+        style={{ cursor: activeTool === "bbox" || activeTool === "polygon" || activeTool === "edge" ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
       >
         <Layer>
           {img && (
@@ -314,10 +397,12 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             imageWidth={image.width}
             imageHeight={image.height}
             scale={scale}
+            stageScale={stageScale}
             compactLabels={stageSize.width < 480}
             onAnnotationClick={handleAnnotationClick}
             onEdgeClick={selectEdge}
-            onCoordinatesChange={updateCoordinates}
+            onBBoxCoordinatesChange={updateBBoxCoordinates}
+            onPolygonPointChange={updatePolygonPoint}
             layerToNormalized={layerToNormalized}
           />
 
@@ -329,13 +414,24 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
           />
         </Layer>
 
-        <Layer listening={false}>
+        <Layer>
           <Rect
             ref={drawingRectRef}
             stroke="#3B82F6"
             strokeWidth={2}
             dash={[4, 4]}
+            listening={false}
           />
+          {activeTool === "polygon" && (
+            <PolygonDraftOverlay
+              points={polygonDraftPoints}
+              cursor={polygonCursor}
+              imageDisplayWidth={image.width * scale}
+              imageDisplayHeight={image.height * scale}
+              stageScale={stageScale}
+              onComplete={() => finishPolygon(image.id, activeLabel)}
+            />
+          )}
         </Layer>
       </Stage>
     </div>

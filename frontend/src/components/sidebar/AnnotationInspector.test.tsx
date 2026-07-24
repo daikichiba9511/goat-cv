@@ -63,6 +63,7 @@ describe("AnnotationInspector", () => {
       selectedId: null,
       selectedEdgeId: null,
       edgeSourceId: null,
+      polygonDraftPoints: [],
       dirty: false,
       saving: false,
       saveError: null,
