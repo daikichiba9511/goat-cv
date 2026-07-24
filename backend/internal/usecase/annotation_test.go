@@ -185,6 +185,24 @@ func TestAnnotationUsecaseBulkReplaceRejectsInvalidSetWithoutChangingAnnotations
 	}
 }
 
+func TestAnnotationUsecaseBulkReplaceRejectsDuplicatePersistentIDs(t *testing.T) {
+	fixture := newAnnotationFixture(t)
+	coordinates := domain.Coordinates(`{"x":0,"y":0,"width":1,"height":1}`)
+
+	_, err := fixture.usecase.BulkReplace(fixture.ctx, annotationTestImageID, []domain.Annotation{
+		{ID: "duplicate-id", Type: domain.AnnotationTypeBBox, Coordinates: coordinates},
+		{ID: "duplicate-id", Type: domain.AnnotationTypeBBox, Coordinates: coordinates},
+	})
+	if !errors.Is(err, usecase.ErrDuplicateAnnotationID) {
+		t.Fatalf("BulkReplace error = %v, want %v", err, usecase.ErrDuplicateAnnotationID)
+	}
+	if annotations, listErr := fixture.usecase.ListByImage(fixture.ctx, annotationTestImageID); listErr != nil {
+		t.Fatalf("ListByImage after rejected replace: %v", listErr)
+	} else if len(annotations) != 0 {
+		t.Fatalf("annotations after rejected replace = %+v, want empty list", annotations)
+	}
+}
+
 type annotationFixture struct {
 	ctx        context.Context
 	repository *sqlite.AnnotationRepository

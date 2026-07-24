@@ -14,6 +14,8 @@ var (
 	ErrInvalidAnnotationType = errors.New("invalid annotation type")
 	// ErrInvalidAnnotationCoordinates indicates coordinates that do not satisfy the annotation type schema.
 	ErrInvalidAnnotationCoordinates = errors.New("invalid annotation coordinates")
+	// ErrDuplicateAnnotationID indicates repeated persistent IDs in one replacement set.
+	ErrDuplicateAnnotationID = errors.New("duplicate annotation id")
 )
 
 type annotationRepository interface {
@@ -81,6 +83,7 @@ func (u *AnnotationUsecase) BulkReplace(ctx context.Context, imageID string, ann
 	// Why: フロントエンドは未保存Annotationを一時IDで扱うため、永続化境界でだけUUID v7へ置き換える。
 	// Why not: Phase 1では操作ログ同期をしないので、個別差分ではなく画像単位の現在状態を正とする。
 	candidateAnnotations := make([]domain.Annotation, len(annotations))
+	usedAnnotationIDs := make(map[string]struct{}, len(annotations))
 	for i, annotation := range annotations {
 		if err := validateAnnotationCoordinates(annotation.Type, annotation.Coordinates); err != nil {
 			return nil, fmt.Errorf("annotations[%d]: %w", i, err)
@@ -88,6 +91,10 @@ func (u *AnnotationUsecase) BulkReplace(ctx context.Context, imageID string, ann
 		if annotation.ID == "" {
 			annotation.ID = uuid.Must(uuid.NewV7()).String()
 		}
+		if _, exists := usedAnnotationIDs[annotation.ID]; exists {
+			return nil, fmt.Errorf("annotations[%d]: %w %q", i, ErrDuplicateAnnotationID, annotation.ID)
+		}
+		usedAnnotationIDs[annotation.ID] = struct{}{}
 		annotation.ImageID = imageID
 		candidateAnnotations[i] = annotation
 	}

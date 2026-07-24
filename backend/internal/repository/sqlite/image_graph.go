@@ -38,7 +38,7 @@ func (r *ImageGraphRepository) Replace(
 	if err := txQueries.DeleteEdgesByImage(ctx, imageID); err != nil {
 		return nil, nil, err
 	}
-	// Why: 同じIDのAnnotationは更新し、削除対象だけを消すことで紐づくCommentを通常保存から守る。
+	// Why: 同じIDのAnnotationは更新し、削除対象だけを消して永続IDと作成時刻を安定させる。
 	persistedAnnotations, err := replaceAnnotations(ctx, txQueries, imageID, annotations)
 	if err != nil {
 		return nil, nil, err

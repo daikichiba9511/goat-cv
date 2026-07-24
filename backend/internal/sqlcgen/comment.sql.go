@@ -75,7 +75,9 @@ SELECT
         ELSE 0
     END AS target_deleted
 FROM comments
-LEFT JOIN annotations ON annotations.id = comments.annotation_id
+LEFT JOIN annotations
+    ON annotations.id = comments.annotation_id
+    AND annotations.image_id = comments.image_id
 WHERE comments.id = ? AND comments.image_id = ?
 `
 
@@ -115,7 +117,9 @@ SELECT
         ELSE 0
     END AS target_deleted
 FROM comments
-LEFT JOIN annotations ON annotations.id = comments.annotation_id
+LEFT JOIN annotations
+    ON annotations.id = comments.annotation_id
+    AND annotations.image_id = comments.image_id
 WHERE comments.image_id = ?
 ORDER BY comments.created_at, comments.id
 `

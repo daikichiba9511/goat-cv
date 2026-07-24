@@ -142,6 +142,12 @@ func TestAnnotationCommentFollowsPersistentAnnotationIdentityAfterDeletion(t *te
 	if _, _, err := fixture.graphRepository.Replace(fixture.ctx, commentImageID, nil, nil); err != nil {
 		t.Fatalf("Replace deleting Annotation returned error: %v", err)
 	}
+	if _, err := fixture.db.ExecContext(fixture.ctx, `
+		INSERT INTO annotations (id, image_id, type, coordinates)
+		VALUES (?, ?, 'bbox', '{"x":0,"y":0,"width":1,"height":1}')
+	`, annotationID, otherCommentImageID); err != nil {
+		t.Fatalf("reuse deleted Annotation ID in another Image: %v", err)
+	}
 	comments = fixture.list(t, commentImageID)
 	if len(comments) != 1 || comments[0].ID != created.ID || !comments[0].TargetDeleted {
 		t.Fatalf("comments after Annotation deletion = %+v, want retained Comment with deleted target", comments)

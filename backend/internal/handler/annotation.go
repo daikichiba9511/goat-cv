@@ -162,7 +162,8 @@ func writeAnnotationError(w http.ResponseWriter, err error) {
 	case errors.Is(err, sql.ErrNoRows):
 		writeError(w, http.StatusNotFound, "annotation not found")
 	case errors.Is(err, usecase.ErrInvalidAnnotationType),
-		errors.Is(err, usecase.ErrInvalidAnnotationCoordinates):
+		errors.Is(err, usecase.ErrInvalidAnnotationCoordinates),
+		errors.Is(err, usecase.ErrDuplicateAnnotationID):
 		writeError(w, http.StatusBadRequest, err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, err.Error())
