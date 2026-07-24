@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import { ListTree, PanelRightClose, PanelRightOpen, Tags } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { BookOpen, ListTree, PanelRightClose, PanelRightOpen, Tags } from "lucide-react";
 import type { LabelDefinition } from "../../types";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import AnnotationInspector from "./AnnotationInspector";
 import LabelPanel from "./LabelPanel";
+
+const GuidelinePanel = lazy(() => import("./GuidelinePanel"));
 
 type Props = {
   labels: LabelDefinition[];
@@ -12,7 +14,7 @@ type Props = {
   onSelectAnnotation: (annotationId: string) => void;
 };
 
-type InspectorTab = "objects" | "labels";
+type InspectorTab = "objects" | "labels" | "guidelines";
 
 // InspectorSidebar keeps object inspection and label management in one fixed-width rail.
 export default function InspectorSidebar({
@@ -22,13 +24,14 @@ export default function InspectorSidebar({
   onSelectAnnotation,
 }: Props) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("objects");
+  const [guidelinesLoaded, setGuidelinesLoaded] = useState(false);
   // Why: 狭いViewportではCanvas幅を優先し、必要な時だけInspectorを開く。
   const [collapsed, setCollapsed] = useState(
     () => window.matchMedia?.("(max-width: 900px)").matches ?? false,
   );
 
   useEffect(() => {
-    // Why: Canvas側で新しく選択された時だけObjectsへ戻し、手動で開いたLabels tabは維持する。
+    // Why: Canvas側で新しく選択された時だけObjectsへ戻し、手動で開いた他tabは維持する。
     return useAnnotationStore.subscribe((state, previousState) => {
       if (state.selectedId && state.selectedId !== previousState.selectedId) {
         setActiveTab("objects");
@@ -54,14 +57,14 @@ export default function InspectorSidebar({
           <PanelRightOpen aria-hidden="true" size={16} strokeWidth={1.75} />
         </button>
       ) : (
-        <div role="tablist" aria-label="Inspector" className="grid h-10 grid-cols-[1fr_1fr_2.5rem] border-b">
+        <div role="tablist" aria-label="Inspector" className="grid h-10 grid-cols-[1fr_1fr_1fr_2.5rem] border-b">
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "objects"}
             aria-controls="objects-panel"
             onClick={() => setActiveTab("objects")}
-            className={`inline-flex items-center justify-center gap-2 border-b-2 text-xs font-medium ${
+            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
               activeTab === "objects"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
@@ -76,7 +79,7 @@ export default function InspectorSidebar({
             aria-selected={activeTab === "labels"}
             aria-controls="labels-panel"
             onClick={() => setActiveTab("labels")}
-            className={`inline-flex items-center justify-center gap-2 border-b-2 text-xs font-medium ${
+            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
               activeTab === "labels"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
@@ -84,6 +87,24 @@ export default function InspectorSidebar({
           >
             <Tags aria-hidden="true" size={15} strokeWidth={1.75} />
             Labels
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "guidelines"}
+            aria-controls="guidelines-panel"
+            onClick={() => {
+              setGuidelinesLoaded(true);
+              setActiveTab("guidelines");
+            }}
+            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
+              activeTab === "guidelines"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+            }`}
+          >
+            <BookOpen aria-hidden="true" size={14} strokeWidth={1.75} />
+            Guide
           </button>
           <button
             type="button"
@@ -114,6 +135,17 @@ export default function InspectorSidebar({
           activeLabel={activeLabel}
           onSelectLabel={onSelectLabel}
         />
+      </div>
+      <div
+        id="guidelines-panel"
+        role="tabpanel"
+        className={!collapsed && activeTab === "guidelines" ? "min-h-0 flex-1" : "hidden"}
+      >
+        {guidelinesLoaded && (
+          <Suspense fallback={<div className="p-3 text-xs text-gray-400">Loading...</div>}>
+            <GuidelinePanel />
+          </Suspense>
+        )}
       </div>
     </aside>
   );
