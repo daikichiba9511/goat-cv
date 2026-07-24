@@ -3,6 +3,7 @@ import type {
   LabelDefinition,
   ImageMeta,
   Annotation,
+  Edge,
   ListResponse,
   LabelCategory,
 } from "../types";
@@ -181,4 +182,20 @@ export async function updateAnnotation(
 
 export async function deleteAnnotation(annotationId: string): Promise<void> {
   return request(`/annotations/${annotationId}`, { method: "DELETE" });
+}
+
+// Edges
+
+export async function listEdges(imageId: string): Promise<ListResponse<Edge>> {
+  return request(`/images/${imageId}/edges`);
+}
+
+export async function bulkReplaceEdges(
+  imageId: string,
+  edges: Omit<Edge, "image_id">[],
+): Promise<ListResponse<Edge>> {
+  return request(`/images/${imageId}/edges`, {
+    method: "PUT",
+    ...json({ edges }),
+  });
 }

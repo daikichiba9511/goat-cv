@@ -1,5 +1,6 @@
-import { Fragment, useRef, useEffect, useState, useCallback } from "react";
+import { Fragment, useMemo, useRef, useEffect, useState, useCallback } from "react";
 import {
+  Arrow,
   Stage,
   Layer,
   Image as KonvaImage,
@@ -22,6 +23,21 @@ type Props = {
   activeLabel: string | null;
 };
 
+type DisplayBBox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+};
+
+function edgeEndpointScale(deltaX: number, deltaY: number, width: number, height: number): number {
+  const widthScale = deltaX === 0 ? Number.POSITIVE_INFINITY : Math.abs((width / 2) / deltaX);
+  const heightScale = deltaY === 0 ? Number.POSITIVE_INFINITY : Math.abs((height / 2) / deltaY);
+  return Math.min(widthScale, heightScale);
+}
+
 export default function AnnotationCanvas({ image, activeTool, activeLabel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -32,8 +48,21 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   const [stageScale, setStageScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
 
-  const { annotations, selectedId, select, addBBox, updateCoordinates, remove } =
-    useAnnotationStore();
+  const {
+    annotations,
+    edges,
+    selectedId,
+    selectedEdgeId,
+    edgeSourceId,
+    select,
+    selectEdge,
+    setEdgeSource,
+    addReadingOrderEdge,
+    addBBox,
+    updateCoordinates,
+    remove,
+    removeEdge,
+  } = useAnnotationStore();
   const { labels } = useProjectStore();
 
   // Why: KonvaはHTMLImageElementを描画元にするため、API URLをReact state上の画像要素へ変換する。
@@ -96,6 +125,27 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     },
     [image.width, image.height, scale],
   );
+
+  const bboxDisplayByAnnotationID = useMemo(() => {
+    const boxes = new Map<string, DisplayBBox>();
+    for (const annotation of annotations) {
+      if (annotation.type !== "bbox") continue;
+      const coords = annotation.coordinates as BBoxCoordinates;
+      const x = coords.x * image.width * scale;
+      const y = coords.y * image.height * scale;
+      const width = coords.width * image.width * scale;
+      const height = coords.height * image.height * scale;
+      boxes.set(annotation.id, {
+        x,
+        y,
+        width,
+        height,
+        centerX: x + width / 2,
+        centerY: y + height / 2,
+      });
+    }
+    return boxes;
+  }, [annotations, image.width, image.height, scale]);
 
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -167,19 +217,27 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
   };
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "select") return;
-    if (e.target === stageRef.current || e.target.getClassName() === "Image") {
+    if (activeTool === "select" && (e.target === stageRef.current || e.target.getClassName() === "Image")) {
       select(null);
+    }
+    if (activeTool === "edge" && (e.target === stageRef.current || e.target.getClassName() === "Image")) {
+      setEdgeSource(null);
+      selectEdge(null);
     }
   };
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+      if ((e.key !== "Delete" && e.key !== "Backspace")) return;
+      if (selectedEdgeId) {
+        removeEdge(selectedEdgeId);
+        return;
+      }
+      if (selectedId) {
         remove(selectedId);
       }
     },
-    [selectedId, remove],
+    [selectedId, selectedEdgeId, remove, removeEdge],
   );
 
   useEffect(() => {
@@ -212,6 +270,23 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
     return luminance > 160 ? "#111827" : "#FFFFFF";
   };
 
+  const getEdgePoints = (sourceBox: DisplayBBox, targetBox: DisplayBBox): [number, number, number, number] => {
+    const deltaX = targetBox.centerX - sourceBox.centerX;
+    const deltaY = targetBox.centerY - sourceBox.centerY;
+    if (deltaX === 0 && deltaY === 0) {
+      return [sourceBox.centerX, sourceBox.centerY, targetBox.centerX, targetBox.centerY];
+    }
+
+    const sourceScale = edgeEndpointScale(deltaX, deltaY, sourceBox.width, sourceBox.height);
+    const targetScale = edgeEndpointScale(deltaX, deltaY, targetBox.width, targetBox.height);
+    return [
+      sourceBox.centerX + deltaX * sourceScale,
+      sourceBox.centerY + deltaY * sourceScale,
+      targetBox.centerX - deltaX * targetScale,
+      targetBox.centerY - deltaY * targetScale,
+    ];
+  };
+
   return (
     <div ref={containerRef} className="w-full h-full">
       <Stage
@@ -233,7 +308,7 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             setStagePos({ x: e.target.x(), y: e.target.y() });
           }
         }}
-        style={{ cursor: activeTool === "bbox" ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
+        style={{ cursor: activeTool === "bbox" || activeTool === "edge" ? "crosshair" : activeTool === "pan" ? "grab" : "default" }}
       >
         <Layer>
           {img && (
@@ -251,12 +326,38 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
             />
           )}
 
+          {edges.map((edge) => {
+            if (edge.type !== "reading_order") return null;
+            const sourceBox = bboxDisplayByAnnotationID.get(edge.source_annotation_id);
+            const targetBox = bboxDisplayByAnnotationID.get(edge.target_annotation_id);
+            if (!sourceBox || !targetBox) return null;
+            const isSelected = edge.id === selectedEdgeId;
+            return (
+              <Arrow
+                key={edge.id}
+                points={getEdgePoints(sourceBox, targetBox)}
+                stroke={isSelected ? "#2563EB" : "#7C3AED"}
+                fill={isSelected ? "#2563EB" : "#7C3AED"}
+                strokeWidth={isSelected ? 3 : 2}
+                pointerLength={8}
+                pointerWidth={8}
+                hitStrokeWidth={14}
+                opacity={0.9}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  selectEdge(edge.id);
+                }}
+              />
+            );
+          })}
+
           {annotations.map((ann) => {
             if (ann.type !== "bbox") return null;
             const coords = ann.coordinates as BBoxCoordinates;
             const color = getLabelColor(ann.label_id);
             const labelName = getLabelName(ann.label_id);
             const isSelected = ann.id === selectedId;
+            const isEdgeSource = ann.id === edgeSourceId;
             const x = coords.x * image.width * scale;
             const y = coords.y * image.height * scale;
             const width = coords.width * image.width * scale;
@@ -271,13 +372,22 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
                   width={width}
                   height={height}
                   stroke={color}
-                  strokeWidth={isSelected ? 3 : 2}
+                  strokeWidth={isSelected || isEdgeSource ? 3 : 2}
                   fill={`${color}20`}
-                  shadowColor={isSelected ? color : undefined}
-                  shadowBlur={isSelected ? 8 : 0}
+                  dash={isEdgeSource && activeTool === "edge" ? [6, 3] : undefined}
+                  shadowColor={isSelected || isEdgeSource ? color : undefined}
+                  shadowBlur={isSelected || isEdgeSource ? 8 : 0}
                   draggable={activeTool === "select"}
                   onClick={(e) => {
                     e.cancelBubble = true;
+                    if (activeTool === "edge") {
+                      if (!edgeSourceId) {
+                        setEdgeSource(ann.id);
+                      } else {
+                        addReadingOrderEdge(image.id, edgeSourceId, ann.id);
+                      }
+                      return;
+                    }
                     select(ann.id);
                   }}
                   onDragEnd={(e) => {
@@ -311,13 +421,13 @@ export default function AnnotationCanvas({ image, activeTool, activeLabel }: Pro
                   x={x}
                   y={labelY}
                   listening={false}
-                  opacity={isSelected ? 1 : 0.92}
+                  opacity={isSelected || isEdgeSource ? 1 : 0.92}
                 >
                   <Tag
                     fill={color}
                     cornerRadius={3}
-                    stroke={isSelected ? "#111827" : color}
-                    strokeWidth={isSelected ? 1 : 0}
+                    stroke={isSelected || isEdgeSource ? "#111827" : color}
+                    strokeWidth={isSelected || isEdgeSource ? 1 : 0}
                   />
                   <Text
                     text={labelName}
