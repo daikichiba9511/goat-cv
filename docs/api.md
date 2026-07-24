@@ -293,6 +293,94 @@ Validation:
 - `table_cell` は `table` category から `cell` category への 1:N Edge のみ許可する
 - `PUT /images/:imageId/edges` は候補グラフ全体を検証し、不正な場合は既存 Edge を変更しない
 
+### Image Annotation Graph
+
+| Method | Path | Description | Phase |
+|--------|------|-------------|-------|
+| `PUT` | `/images/:imageId/graph` | AnnotationとEdgeの原子的な全置換 | 2 |
+
+```jsonc
+// PUT /images/:imageId/graph
+// Request
+{
+  "annotations": [
+    {
+      "client_id": "temp-annotation-1",
+      "id": "",
+      "type": "bbox",
+      "coordinates": { "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.05 },
+      "label_id": "0194..."
+    },
+    {
+      "client_id": "existing-annotation-client-id",
+      "id": "0195...",
+      "type": "bbox",
+      "coordinates": { "x": 0.6, "y": 0.2, "width": 0.3, "height": 0.05 },
+      "label_id": "0194..."
+    }
+  ],
+  "edges": [
+    {
+      "client_id": "temp-edge-1",
+      "id": "",
+      "source_annotation_client_id": "temp-annotation-1",
+      "target_annotation_client_id": "existing-annotation-client-id",
+      "type": "reading_order"
+    }
+  ]
+}
+
+// Response 200
+{
+  "annotations": [
+    {
+      "client_id": "temp-annotation-1",
+      "annotation": {
+        "id": "0194...",
+        "image_id": "0194...",
+        "type": "bbox",
+        "coordinates": { "x": 0.1, "y": 0.2, "width": 0.3, "height": 0.05 },
+        "label_id": "0194...",
+        "created_at": "2026-03-23T12:00:00Z"
+      }
+    },
+    {
+      "client_id": "existing-annotation-client-id",
+      "annotation": {
+        "id": "0195...",
+        "image_id": "0194...",
+        "type": "bbox",
+        "coordinates": { "x": 0.6, "y": 0.2, "width": 0.3, "height": 0.05 },
+        "label_id": "0194...",
+        "created_at": "2026-03-23T12:00:00Z"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "client_id": "temp-edge-1",
+      "edge": {
+        "id": "0194...",
+        "image_id": "0194...",
+        "source_annotation_id": "0194...",
+        "target_annotation_id": "0194...",
+        "type": "reading_order"
+      }
+    }
+  ]
+}
+```
+
+Validation and transaction rules:
+
+- `annotations` と `edges` は必須であり、空配列はImageのAnnotation Graphを空にする
+- `client_id` は各配列内で一意なrequest-local IDとし、新規・既存Resourceの両方で必須とする
+- `id` は既存の永続IDを更新する場合に送り、新規Resourceでは空文字列とする
+- Edge端点は永続IDや配列位置ではなく、同じRequest内のAnnotation `client_id`を参照する
+- Annotation、client参照、Edge集合をすべて検証してから、削除・Annotation挿入・Edge挿入を1つのDB Transactionで実行する
+- 検証またはDB処理に失敗した場合、既存のAnnotationとEdgeをどちらも変更しない
+- Responseの配列順は対応付けの契約に含めず、Clientは各Itemの`client_id`で永続Resourceを特定する
+
 ### Guidelines
 
 | Method | Path | Description | Phase |
@@ -431,12 +519,13 @@ COCO/YOLO はノード（Annotation）のみ対応。エッジ（Reading Order, 
 
 アノテーション作業は「画像を開いて複数のAnnotation/Edgeを編集し、保存する」というフローが基本。
 
-2つの保存戦略を用意する:
+2つの編集戦略を用意する:
 
 | API | 用途 |
 |-----|------|
 | `POST/PATCH/DELETE` (個別) | リアルタイム自動保存、共同編集時の差分同期 |
-| `PUT` (一括) | 明示的な保存操作、オフライン後の同期 |
+| `PUT /images/:imageId/graph` | AnnotationとEdgeをまとめる明示的な保存操作 |
 
-Phase 1 では `PUT` (一括保存) を主に使い、シンプルに実装する。
+Annotator UIはGraph単位の`PUT`を使用し、AnnotationとEdgeのCollection別`PUT`を連続実行しない。
+Collection別`PUT`はResource単位のAPIとして残るが、Annotation Graph全体の原子性は保証しない。
 Phase 6 の共同編集で個別操作 + WebSocket 差分同期に発展させる。

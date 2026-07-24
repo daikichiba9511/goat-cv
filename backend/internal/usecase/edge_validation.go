@@ -17,14 +17,30 @@ func (u *EdgeUsecase) validateEdgeSet(ctx context.Context, imageID string, edges
 	if err != nil {
 		return err
 	}
+	return validateEdgeSetAgainstAnnotations(ctx, imageID, edges, annotations, u.annotationRepo, u.labelRepo)
+}
+
+// validateEdgeSetAgainstAnnotations validates candidate edges against the annotation set saved with them.
+func validateEdgeSetAgainstAnnotations(
+	ctx context.Context,
+	imageID string,
+	edges []domain.Edge,
+	annotations []domain.Annotation,
+	annotationRepo edgeAnnotationRepository,
+	labelRepo edgeLabelRepository,
+) error {
+	if len(edges) == 0 {
+		return nil
+	}
+
 	annotationByID := make(map[string]domain.Annotation, len(annotations))
 	for _, annotation := range annotations {
 		annotationByID[annotation.ID] = annotation
 	}
 
 	validator := edgeSetValidator{
-		annotationRepo:    u.annotationRepo,
-		labelRepo:         u.labelRepo,
+		annotationRepo:    annotationRepo,
+		labelRepo:         labelRepo,
 		imageID:           imageID,
 		annotationByID:    annotationByID,
 		relations:         make(map[edgeRelation]struct{}, len(edges)),
@@ -97,6 +113,9 @@ func (v *edgeSetValidator) validate(ctx context.Context, edge domain.Edge) error
 func (v *edgeSetValidator) annotation(ctx context.Context, annotationID string) (domain.Annotation, error) {
 	if annotation, exists := v.annotationByID[annotationID]; exists {
 		return annotation, nil
+	}
+	if v.annotationRepo == nil {
+		return domain.Annotation{}, ErrEdgeAnnotationNotFound
 	}
 
 	// Why: 画像内一覧にないIDだけ個別検索し、存在しない参照と別画像への参照を区別する。

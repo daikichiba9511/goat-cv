@@ -6,6 +6,8 @@ type Props = {
   onToolChange: (tool: Tool) => void;
   onSave: () => void;
   dirty: boolean;
+  saving: boolean;
+  saveError: string | null;
   projectName: string;
   imageName: string | null;
   hasImage: boolean;
@@ -26,6 +28,8 @@ export default function Toolbar({
   onToolChange,
   onSave,
   dirty,
+  saving,
+  saveError,
   projectName,
   imageName,
   hasImage,
@@ -92,16 +96,26 @@ export default function Toolbar({
         </div>
       )}
 
+      {saveError && (
+        <span
+          role="alert"
+          title={saveError}
+          className="max-w-64 truncate text-xs text-red-600"
+        >
+          {saveError}
+        </span>
+      )}
+
       <button
         onClick={onSave}
-        disabled={!dirty}
-        className={`px-3 py-1 text-sm rounded ${
-          dirty
+        disabled={!dirty || saving}
+        className={`min-w-16 px-3 py-1 text-sm rounded ${
+          dirty && !saving
             ? "bg-green-600 text-white hover:bg-green-700"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
       >
-        Save
+        {saving ? "Saving..." : "Save"}
       </button>
     </div>
   );

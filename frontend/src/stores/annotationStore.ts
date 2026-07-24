@@ -3,12 +3,16 @@ import type { Annotation, BBoxCoordinates, Edge } from "../types";
 import * as api from "../api/client";
 
 type AnnotationStore = {
+  loadedImageId: string | null;
   annotations: Annotation[];
   edges: Edge[];
   selectedId: string | null;
   selectedEdgeId: string | null;
   edgeSourceId: string | null;
   dirty: boolean;
+  saving: boolean;
+  saveError: string | null;
+  revision: number;
 
   loadAnnotations: (imageId: string) => Promise<void>;
   addBBox: (imageId: string, coords: BBoxCoordinates, labelId: string | null) => void;
@@ -28,26 +32,34 @@ let nextTempId = 0;
 let nextTempEdgeId = 0;
 
 export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
+  loadedImageId: null,
   annotations: [],
   edges: [],
   selectedId: null,
   selectedEdgeId: null,
   edgeSourceId: null,
   dirty: false,
+  saving: false,
+  saveError: null,
+  revision: 0,
 
   loadAnnotations: async (imageId) => {
     const [annotationRes, edgeRes] = await Promise.all([
       api.listAnnotations(imageId),
       api.listEdges(imageId),
     ]);
-    set({
+    set((state) => ({
+      loadedImageId: imageId,
       annotations: annotationRes.items,
       edges: edgeRes.items,
       selectedId: null,
       selectedEdgeId: null,
       edgeSourceId: null,
       dirty: false,
-    });
+      saving: false,
+      saveError: null,
+      revision: state.revision + 1,
+    }));
   },
 
   addBBox: (imageId, coords, labelId) => {
@@ -66,6 +78,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       selectedEdgeId: null,
       edgeSourceId: null,
       dirty: true,
+      revision: s.revision + 1,
     }));
   },
 
@@ -75,6 +88,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         a.id === id ? { ...a, coordinates: coords } : a,
       ),
       dirty: true,
+      revision: s.revision + 1,
     }));
   },
 
@@ -84,6 +98,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         a.id === id ? { ...a, label_id: labelId } : a,
       ),
       dirty: true,
+      revision: s.revision + 1,
     }));
   },
 
@@ -118,6 +133,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
         selectedEdgeId: null,
         edgeSourceId: targetAnnotationId,
         dirty: true,
+        revision: s.revision + 1,
       };
     });
   },
@@ -131,6 +147,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       selectedId: s.selectedId === id ? null : s.selectedId,
       edgeSourceId: s.edgeSourceId === id ? null : s.edgeSourceId,
       dirty: true,
+      revision: s.revision + 1,
     }));
   },
 
@@ -139,65 +156,105 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       edges: s.edges.filter((edge) => edge.id !== id),
       selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
       dirty: true,
+      revision: s.revision + 1,
     }));
   },
 
   save: async (imageId) => {
-    const { annotations, edges, selectedId } = get();
-    // Why: サーバーは空IDを新規Annotationとして扱う。temp IDを送らず永続IDの責任をBackendに寄せる。
-    const payload = annotations.map((a) => ({
-      id: a.id.startsWith("temp-") ? "" : a.id,
-      type: a.type,
-      coordinates: a.coordinates,
-      label_id: a.label_id,
-    }));
-    const annotationRes = await api.bulkReplaceAnnotations(imageId, payload);
+    if (get().saving) return;
 
-    const savedAnnotationIdByClientId = new Map<string, string>();
-    annotations.forEach((annotation, index) => {
-      const savedAnnotation = annotationRes.items[index];
-      if (savedAnnotation) {
-        savedAnnotationIdByClientId.set(annotation.id, savedAnnotation.id);
-      }
-    });
-
-    const validAnnotationIds = new Set(annotationRes.items.map((annotation) => annotation.id));
-    const edgePayload = edges.flatMap((edge) => {
-      const sourceAnnotationId = savedAnnotationIdByClientId.get(edge.source_annotation_id);
-      const targetAnnotationId = savedAnnotationIdByClientId.get(edge.target_annotation_id);
-      if (
-        !sourceAnnotationId ||
-        !targetAnnotationId ||
-        !validAnnotationIds.has(sourceAnnotationId) ||
-        !validAnnotationIds.has(targetAnnotationId)
-      ) {
-        return [];
-      }
-      return [{
+    const {
+      annotations,
+      edges,
+      selectedId,
+      selectedEdgeId,
+      edgeSourceId,
+      revision,
+      loadedImageId,
+    } = get();
+    const graph = {
+      annotations: annotations.map((annotation) => ({
+        client_id: annotation.id,
+        id: annotation.id.startsWith("temp-") ? "" : annotation.id,
+        type: annotation.type,
+        coordinates: annotation.coordinates,
+        label_id: annotation.label_id,
+      })),
+      edges: edges.map((edge) => ({
+        client_id: edge.id,
         id: edge.id.startsWith("temp-edge-") ? "" : edge.id,
-        source_annotation_id: sourceAnnotationId,
-        target_annotation_id: targetAnnotationId,
+        source_annotation_client_id: edge.source_annotation_id,
+        target_annotation_client_id: edge.target_annotation_id,
         type: edge.type,
-      }];
-    });
-    const edgeRes = await api.bulkReplaceEdges(imageId, edgePayload);
+      })),
+    };
 
-    set({
-      annotations: annotationRes.items,
-      edges: edgeRes.items,
-      selectedId: selectedId ? savedAnnotationIdByClientId.get(selectedId) ?? null : null,
-      selectedEdgeId: null,
-      edgeSourceId: null,
-      dirty: false,
-    });
+    set({ saving: true, saveError: null });
+    try {
+      const savedGraph = await api.saveImageGraph(imageId, graph);
+      // Why: 画像切替後に届いた旧画像の保存結果を、現在表示中のグラフへ適用しない。
+      if (get().loadedImageId !== loadedImageId) {
+        return;
+      }
+      if (get().revision !== revision) {
+        // Why: 保存開始後の編集を古いレスポンスで上書きせず、次の保存対象としてローカルに残す。
+        set({ saving: false, saveError: null });
+        return;
+      }
+      const savedAnnotationByClientID = new Map(
+        savedGraph.annotations.map((item) => [item.client_id, item.annotation]),
+      );
+      const savedEdgeByClientID = new Map(
+        savedGraph.edges.map((item) => [item.client_id, item.edge]),
+      );
+      // Why: APIの応答順は契約に含めず、client_idでIDを解決しながらローカルの描画順を保つ。
+      const savedAnnotations = annotations.map((annotation) => {
+        const savedAnnotation = savedAnnotationByClientID.get(annotation.id);
+        if (!savedAnnotation) {
+          throw new Error(`save response is missing annotation ${annotation.id}`);
+        }
+        return savedAnnotation;
+      });
+      const savedEdges = edges.map((edge) => {
+        const savedEdge = savedEdgeByClientID.get(edge.id);
+        if (!savedEdge) {
+          throw new Error(`save response is missing edge ${edge.id}`);
+        }
+        return savedEdge;
+      });
+
+      set({
+        annotations: savedAnnotations,
+        edges: savedEdges,
+        selectedId: selectedId ? savedAnnotationByClientID.get(selectedId)?.id ?? null : null,
+        selectedEdgeId: selectedEdgeId ? savedEdgeByClientID.get(selectedEdgeId)?.id ?? null : null,
+        edgeSourceId: edgeSourceId ? savedAnnotationByClientID.get(edgeSourceId)?.id ?? null : null,
+        dirty: false,
+        saving: false,
+        saveError: null,
+      });
+    } catch (error) {
+      if (get().loadedImageId !== loadedImageId) {
+        return;
+      }
+      set({
+        dirty: true,
+        saving: false,
+        saveError: error instanceof Error ? error.message : String(error),
+      });
+    }
   },
 
-  clear: () => set({
+  clear: () => set((state) => ({
+    loadedImageId: null,
     annotations: [],
     edges: [],
     selectedId: null,
     selectedEdgeId: null,
     edgeSourceId: null,
     dirty: false,
-  }),
+    saving: false,
+    saveError: null,
+    revision: state.revision + 1,
+  })),
 }));

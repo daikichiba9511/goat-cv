@@ -12,7 +12,7 @@ import LabelPanel from "../components/sidebar/LabelPanel";
 export default function Annotator() {
   const { projectId } = useParams<{ projectId: string }>();
   const { currentProject, selectProject, labels, images } = useProjectStore();
-  const { loadAnnotations, save, dirty, clear } = useAnnotationStore();
+  const { loadAnnotations, save, dirty, saving, saveError, clear } = useAnnotationStore();
   const [currentImage, setCurrentImage] = useState<ImageMeta | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -84,6 +84,8 @@ export default function Annotator() {
           onToolChange={setActiveTool}
           onSave={handleSave}
           dirty={dirty}
+          saving={saving}
+          saveError={saveError}
           projectName={currentProject.name}
           imageName={currentImage?.filename ?? null}
           hasImage={currentImage !== null}
