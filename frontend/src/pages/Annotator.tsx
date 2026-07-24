@@ -150,6 +150,7 @@ export default function Annotator() {
         activeLabel={activeLabel}
         onSelectLabel={setActiveLabel}
         onSelectAnnotation={handleSelectAnnotation}
+        currentImageId={currentImage?.id ?? null}
       />
     </div>
   );

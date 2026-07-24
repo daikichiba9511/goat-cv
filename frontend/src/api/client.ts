@@ -9,6 +9,8 @@ import type {
   Guideline,
   ImageGraphSaveRequest,
   ImageGraphSaveResponse,
+  QAComment,
+  CreateCommentInput,
 } from "../types";
 
 const BASE = "/api/v1";
@@ -135,6 +137,44 @@ export async function deleteGuideline(
   guidelineId: string,
 ): Promise<void> {
   return request(`/projects/${projectId}/guidelines/${guidelineId}`, {
+    method: "DELETE",
+  });
+}
+
+// Comments
+
+export async function createComment(
+  imageId: string,
+  input: CreateCommentInput,
+): Promise<QAComment> {
+  return request(`/images/${imageId}/comments`, {
+    method: "POST",
+    ...json(input),
+  });
+}
+
+export async function listComments(
+  imageId: string,
+): Promise<ListResponse<QAComment>> {
+  return request(`/images/${imageId}/comments`);
+}
+
+export async function setCommentResolved(
+  imageId: string,
+  commentId: string,
+  resolved: boolean,
+): Promise<QAComment> {
+  return request(`/images/${imageId}/comments/${commentId}`, {
+    method: "PATCH",
+    ...json({ resolved }),
+  });
+}
+
+export async function deleteComment(
+  imageId: string,
+  commentId: string,
+): Promise<void> {
+  return request(`/images/${imageId}/comments/${commentId}`, {
     method: "DELETE",
   });
 }

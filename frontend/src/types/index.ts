@@ -31,6 +31,28 @@ export type Guideline = {
   updated_at: string;
 };
 
+export type CommentType = "question" | "issue" | "note";
+
+export type QAComment = {
+  id: string;
+  image_id: string;
+  annotation_id: string | null;
+  author: string;
+  body: string;
+  type: CommentType;
+  resolved: boolean;
+  target_deleted: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateCommentInput = {
+  annotation_id: string | null;
+  author: string;
+  body: string;
+  type: CommentType;
+};
+
 export type ImageStatus =
   | "pending"
   | "annotated"

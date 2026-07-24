@@ -1,20 +1,22 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BookOpen, ListTree, PanelRightClose, PanelRightOpen, Tags } from "lucide-react";
+import { BookOpen, ListTree, MessageSquareText, PanelRightClose, PanelRightOpen, Tags } from "lucide-react";
 import type { LabelDefinition } from "../../types";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import AnnotationInspector from "./AnnotationInspector";
 import LabelPanel from "./LabelPanel";
 
 const GuidelinePanel = lazy(() => import("./GuidelinePanel"));
+const CommentPanel = lazy(() => import("./CommentPanel"));
 
 type Props = {
   labels: LabelDefinition[];
   activeLabel: string | null;
   onSelectLabel: (labelId: string | null) => void;
   onSelectAnnotation: (annotationId: string) => void;
+  currentImageId: string | null;
 };
 
-type InspectorTab = "objects" | "labels" | "guidelines";
+type InspectorTab = "objects" | "labels" | "guidelines" | "comments";
 
 // InspectorSidebar keeps object inspection and label management in one fixed-width rail.
 export default function InspectorSidebar({
@@ -22,19 +24,21 @@ export default function InspectorSidebar({
   activeLabel,
   onSelectLabel,
   onSelectAnnotation,
+  currentImageId,
 }: Props) {
   const [activeTab, setActiveTab] = useState<InspectorTab>("objects");
   const [guidelinesLoaded, setGuidelinesLoaded] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
   // Why: 狭いViewportではCanvas幅を優先し、必要な時だけInspectorを開く。
   const [collapsed, setCollapsed] = useState(
     () => window.matchMedia?.("(max-width: 900px)").matches ?? false,
   );
 
   useEffect(() => {
-    // Why: Canvas側で新しく選択された時だけObjectsへ戻し、手動で開いた他tabは維持する。
+    // Why: Commentsは選択Annotationとの連動を維持し、それ以外ではObjectsへ戻して選択内容を直接見せる。
     return useAnnotationStore.subscribe((state, previousState) => {
       if (state.selectedId && state.selectedId !== previousState.selectedId) {
-        setActiveTab("objects");
+        setActiveTab((currentTab) => currentTab === "comments" ? currentTab : "objects");
         setCollapsed(false);
       }
     });
@@ -57,54 +61,76 @@ export default function InspectorSidebar({
           <PanelRightOpen aria-hidden="true" size={16} strokeWidth={1.75} />
         </button>
       ) : (
-        <div role="tablist" aria-label="Inspector" className="grid h-10 grid-cols-[1fr_1fr_1fr_2.5rem] border-b">
+        <div role="tablist" aria-label="Inspector" className="grid h-10 grid-cols-5 border-b">
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "objects"}
             aria-controls="objects-panel"
+            aria-label="Objects"
+            title="Objects"
             onClick={() => setActiveTab("objects")}
-            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
+            className={`inline-flex items-center justify-center border-b-2 ${
               activeTab === "objects"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
             }`}
           >
             <ListTree aria-hidden="true" size={15} strokeWidth={1.75} />
-            Objects
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "labels"}
             aria-controls="labels-panel"
+            aria-label="Labels"
+            title="Labels"
             onClick={() => setActiveTab("labels")}
-            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
+            className={`inline-flex items-center justify-center border-b-2 ${
               activeTab === "labels"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
             }`}
           >
             <Tags aria-hidden="true" size={15} strokeWidth={1.75} />
-            Labels
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={activeTab === "guidelines"}
             aria-controls="guidelines-panel"
+            aria-label="Guidelines"
+            title="Guidelines"
             onClick={() => {
               setGuidelinesLoaded(true);
               setActiveTab("guidelines");
             }}
-            className={`inline-flex items-center justify-center gap-1 border-b-2 text-[11px] font-medium ${
+            className={`inline-flex items-center justify-center border-b-2 ${
               activeTab === "guidelines"
                 ? "border-blue-600 text-blue-700"
                 : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
             }`}
           >
             <BookOpen aria-hidden="true" size={14} strokeWidth={1.75} />
-            Guide
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "comments"}
+            aria-controls="comments-panel"
+            aria-label="Comments"
+            title="Comments"
+            onClick={() => {
+              setCommentsLoaded(true);
+              setActiveTab("comments");
+            }}
+            className={`inline-flex items-center justify-center border-b-2 ${
+              activeTab === "comments"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+            }`}
+          >
+            <MessageSquareText aria-hidden="true" size={14} strokeWidth={1.75} />
           </button>
           <button
             type="button"
@@ -124,6 +150,17 @@ export default function InspectorSidebar({
         className={!collapsed && activeTab === "objects" ? "min-h-0 flex-1" : "hidden"}
       >
         <AnnotationInspector labels={labels} onSelectAnnotation={onSelectAnnotation} />
+      </div>
+      <div
+        id="comments-panel"
+        role="tabpanel"
+        className={!collapsed && activeTab === "comments" ? "min-h-0 flex-1" : "hidden"}
+      >
+        {commentsLoaded && (
+          <Suspense fallback={<div className="p-3 text-xs text-gray-400">Loading...</div>}>
+            <CommentPanel imageId={currentImageId} />
+          </Suspense>
+        )}
       </div>
       <div
         id="labels-panel"

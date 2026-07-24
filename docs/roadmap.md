@@ -28,6 +28,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 8 | Add polygon annotation UI | [PR #28](https://github.com/daikichiba9511/goat-cv/pull/28) | Added Polygon drawing, vertex editing, Edge connections, deletion, save, and reload |
 | 9 | Add COCO and YOLO export | [PR #29](https://github.com/daikichiba9511/goat-cv/pull/29) | Added self-contained COCO and YOLO archives with transform-aware coordinates, reproducible class mappings, and explicit exclusions |
 | 12 | Add guideline management | [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30) | Added Project-scoped Guideline CRUD and safe Markdown viewing without losing Canvas editing state |
+| 13 | Add QA comments | [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31) | Added Image/Annotation QA Comments with selected-object filtering, resolved state, and retained audit history |
 
 ## Planned Work
 
@@ -35,7 +36,6 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 |-------|--------|----------|-------------|
 | 10 | Decide workflow status transitions | [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | One state-machine specification shared by the product, design, and API documents |
 | 11 | Implement workflow status transitions | Follow-up to [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | Image status APIs, review actions, UI, and behavior tests derived from the approved state machine |
-| 13 | Add QA comments | [Issue #17](https://github.com/daikichiba9511/goat-cv/issues/17) | Image/Annotation comments with type and resolved state |
 | 14 | Design pre-inference integration | [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Provider-independent API contract and candidate lifecycle decision |
 | 15 | Add pre-inference candidates | Follow-up to [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Model API integration and accept, edit, and discard workflows derived from the approved design |
 | 16 | Decide collaboration architecture | [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Comparison and decision for the first collaboration and conflict boundary |
@@ -115,7 +115,7 @@ Work items:
 
 - [Issue #15: Decide workflow status transitions](https://github.com/daikichiba9511/goat-cv/issues/15), followed by implementation issues
 - Completed: Guideline management in [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30)
-- [Issue #17: Add QA comments](https://github.com/daikichiba9511/goat-cv/issues/17)
+- Completed: QA Comment management in [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31)
 
 Completion criteria:
 
@@ -166,4 +166,4 @@ Completion criteria:
 
 ## Current Product Baseline
 
-The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, Project Guideline management and safe Markdown viewing, transform controls, GOAT JSON, COCO, and YOLO export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.
+The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, Project Guideline and QA Comment management with safe Markdown viewing, transform controls, GOAT JSON, COCO, and YOLO export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.

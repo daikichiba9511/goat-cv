@@ -109,15 +109,16 @@ Project 1 ---* Image 1 ---* Annotation
                             |     ├─ target_annotation_id
                             |     └─ type: "reading_order" | "key_value" | "table_cell"
                             |
-                            └──* Comment (QA / Escalation)
+                            └──* Comment (QA)
                                   |
                                   ├─ id
                                   ├─ author
                                   ├─ body (Markdown)
-                                  ├─ type: "qa_feedback" | "escalation"
-                                  ├─ annotation_id (nullable, 特定Annotationへの指摘)
+                                  ├─ type: "question" | "issue" | "note"
+                                  ├─ annotation_id (nullable, 論理参照)
                                   ├─ resolved: bool
-                                  └─ created_at
+                                  ├─ created_at
+                                  └─ updated_at
 ```
 
 ### Image Status (Workflow)
@@ -146,7 +147,7 @@ Project 1 ---* Image 1 ---* Annotation
 - **Edge** — Annotation間の有向関係（辺）。typeによって関係の意味が変わる
 - **LabelDefinition** — プロジェクト単位で定義するラベル体系。categoryでタスク種別を区別
 - **Guideline** — プロジェクト単位のアノテーションマニュアル。Markdown形式、複数ページ構成
-- **Comment** — Image/Annotationに対するQAフィードバックやエスカレーション
+- **Comment** — Image全体または特定Annotationに対する質問、問題、補足。Annotationが削除された後もQAの経緯として保持する
 
 Image単位でAnnotation(ノード) + Edge(辺) の有向グラフを構成する。
 
@@ -340,7 +341,7 @@ stateDiagram-v2
 │          │                                      │                   │
 │          │  Toolbar: BBox / Polygon / Edge /    │ [Tab: Guidelines] │
 │          │           Select / Pan               │  ・view / manage  │
-│          │                                      │ [Future: Comments]│
+│          │                                      │ [Tab: Comments]   │
 │          │                                      │                   │
 └──────────┴──────────────────────────────────────┴───────────────────┘
 ```
@@ -348,14 +349,24 @@ stateDiagram-v2
 ### Navigation Flows
 
 - **アノテーション作業中にマニュアル参照**: Right PanelのGuidelineタブで即座に確認。Canvas作業を中断しない
-- **QAフィードバック確認**: Right PanelのCommentsタブ。特定Annotationへの指摘はクリックでCanvasにハイライト
-- **エスカレーション起票**: Commentsタブから起票。画像/特定Annotationにピン留め可能
+- **QAフィードバック確認**: Right PanelのCommentsタブ。選択中Annotationへの指摘だけに絞り込み可能
+- **QA Comment作成**: Commentsタブから`question`、`issue`、`note`をImage全体または特定Annotationへ記録
 - **ステータスフィルタ**: Sidebarで`pending` / `rejected`等でフィルタし、作業対象を素早く特定
 - **レビュー画面**: 同じAnnotator画面を使い、reviewer権限でapprove/rejectボタンを表示
 
 Guideline panelはProjectに属するページを`display_order`、`title`、Guideline IDの順で表示する。
 閲覧、追加、編集、削除はRight Panel内で完結し、tab切替やpanel開閉でCanvasを再mountしない。
 Markdown rendererはraw HTMLを解釈せず、画像構文を画像要素へ変換しない。
+
+Comments panelはImage全体と選択中Annotationの表示対象を切り替える。
+CanvasまたはObjects tabで永続化済みAnnotationを選択した場合は、そのAnnotationのCommentを表示対象にする。
+未保存AnnotationにはCommentを作成できず、保存後に発行されたAnnotation IDを対象とする。
+Comment本文はGuidelineと同じ安全なMarkdown rendererで表示する。
+CommentはImageを所有境界とし、作成、一覧、解決状態の更新、削除をすべてImage-scoped APIで行う。
+Annotation向けCommentを作成するときは、そのAnnotationが指定Imageに属することを検証する。
+`annotation_id`には外部キーを設定しない。
+Annotationを削除してもQAの経緯と対象IDを保持するためであり、cascadeではCommentが消失し、`SET NULL`ではImage向けCommentと区別できなくなる。
+一覧レスポンスの`target_deleted`で参照先が削除済みであることを示す。
 
 ## Directory Structure
 

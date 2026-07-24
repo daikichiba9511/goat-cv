@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { type Components } from "react-markdown";
 import {
   BookOpen,
   FilePlus2,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useProjectStore } from "../../stores/projectStore";
+import SafeMarkdown from "../markdown/SafeMarkdown";
 
 type EditorMode = "view" | "create" | "edit";
 
@@ -54,7 +54,6 @@ const markdownComponents: Components = {
   ),
   th: ({ children }) => <th className="border bg-gray-100 px-2 py-1.5 font-semibold">{children}</th>,
   td: ({ children }) => <td className="border px-2 py-1.5 align-top">{children}</td>,
-  img: () => null,
 };
 
 // GuidelinePanel keeps Project manuals available without changing Canvas editing state.
@@ -240,15 +239,7 @@ export default function GuidelinePanel() {
             </div>
             {error && <p role="alert" className="border-b bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
             <article className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-              {/* Why: Project編集者が入力したraw HTMLと外部画像を描画対象から外し、閲覧時のscript実行や追跡を防ぐ。 */}
-              <ReactMarkdown
-                skipHtml
-                remarkPlugins={[remarkGfm]}
-                disallowedElements={["img"]}
-                components={markdownComponents}
-              >
-                {selectedGuideline.body}
-              </ReactMarkdown>
+              <SafeMarkdown body={selectedGuideline.body} components={markdownComponents} />
             </article>
           </div>
         ) : (
