@@ -51,7 +51,7 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 - Project に画像をアップロードできる
 - アップロードした画像を一覧表示し、選択できる
-- 画像メタデータとして原画像サイズ、変換後サイズ、回転、反転、ステータスを保持する
+- 画像メタデータとして原画像サイズ、変換後サイズ、回転、反転、workflow status、escalation状態を保持する
 - 画像ファイルはローカルファイルシステムに保存し、APIから配信する
 - 回転は `0`、`90`、`180`、`270` のみをサポートする
 
@@ -87,10 +87,14 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 ### Workflow and QA
 
-- Image status は `pending`、`annotated`、`in_review`、`approved`、`rejected`、`escalated` を持つ
-- Annotator は作業完了時に `annotated` へ変更できる
-- Reviewer は `in_review`、`approved`、`rejected` へ変更できる
-- 判断に迷う画像または Annotation に対して `escalated` を設定できる
+- Image workflowのlifecycle statusは`pending`、`annotated`、`in_review`、`rejected`、`approved`を持つ
+- Image workflowのescalation状態はlifecycleから独立した`escalated`で保持する
+- 新規Imageは`status: pending`かつ`escalated: false`で開始する
+- lifecycleとescalationは[Image Workflow Status Specification](workflow-status.md)に定義したeventでのみ遷移できる
+- `rejected`は差戻し後の永続状態とし、修正完了eventで`annotated`へ遷移する
+- `escalated: true`の間はComment操作と閲覧を許可し、Annotation Graph、transform、lifecycleの変更を拒否する
+- Annotation単位の懸念はCommentへ記録し、作業停止が必要な場合だけImageをescalateする
+- Phase 4では認証とRole制御を行わず、同じ利用者がすべてのworkflow eventを実行できる
 - Project に複数の Guideline を作成、表示、更新、削除できる
 - Guideline は `title`、Markdown形式の `body`、0以上の `display_order` を持つ
 - Guideline は `display_order`、`title`、Guideline IDの順に表示し、同順位でも順序を安定させる
