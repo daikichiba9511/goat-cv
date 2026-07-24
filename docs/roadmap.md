@@ -35,12 +35,12 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 12 | Add guideline management | [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30) | Added Project-scoped Guideline CRUD and safe Markdown viewing without losing Canvas editing state |
 | 13 | Add QA comments | [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31) | Added Image/Annotation QA Comments with selected-object filtering, resolved state, and retained audit history |
 | 14 | Initial pre-inference design | [PR #46](https://github.com/daikichiba9511/goat-cv/pull/46) | Superseded because it incorrectly assigned model execution and Provider operation to GOAT; tracked by [Issue #47](https://github.com/daikichiba9511/goat-cv/issues/47) |
+| 15 | Correct the pre-label responsibility boundary | [PR #51](https://github.com/daikichiba9511/goat-cv/pull/51) | Replaced inference execution with project-level import of generated Pre-Label JSON |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 15 | Correct the pre-label responsibility boundary | [Issue #47](https://github.com/daikichiba9511/goat-cv/issues/47) | Replace inference execution with project-level import of generated results |
 | 16 | Persist project pre-label imports | [Issue #48](https://github.com/daikichiba9511/goat-cv/issues/48) | Atomic GOAT Pre-Label JSON import and image-level current pre-label retrieval |
 | 16 | Save pre-label decisions atomically | [Issue #49](https://github.com/daikichiba9511/goat-cv/issues/49) | PreLabel decisions committed with the Image Graph |
 | 16 | Add the Annotator pre-label workflow | [Issue #50](https://github.com/daikichiba9511/goat-cv/issues/50) | Project import and staged accept, edit, and discard actions |
@@ -53,7 +53,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 - Completed [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) provides object and label inspection before the remaining drawing tools are added.
 - Completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) provides the atomic save boundary used by completed [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12).
 - Completed [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) defines the behavior, completed [Issue #33](https://github.com/daikichiba9511/goat-cv/issues/33) persists it, and completed [Issue #34](https://github.com/daikichiba9511/goat-cv/issues/34) provides the API and mutation guards used by completed [Issue #35](https://github.com/daikichiba9511/goat-cv/issues/35) and completed [Issue #36](https://github.com/daikichiba9511/goat-cv/issues/36).
-- [Issue #47](https://github.com/daikichiba9511/goat-cv/issues/47) supersedes the inference execution contract from completed [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) and [PR #46](https://github.com/daikichiba9511/goat-cv/pull/46).
+- Completed [Issue #47](https://github.com/daikichiba9511/goat-cv/issues/47) and [PR #51](https://github.com/daikichiba9511/goat-cv/pull/51) supersede the inference execution contract from completed [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) and [PR #46](https://github.com/daikichiba9511/goat-cv/pull/46).
 - [Issue #48](https://github.com/daikichiba9511/goat-cv/issues/48) provides the Import API and persistence base used by [Issue #49](https://github.com/daikichiba9511/goat-cv/issues/49). [Issue #50](https://github.com/daikichiba9511/goat-cv/issues/50) starts after both are merged.
 - [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) remains decision work and creates smaller implementation issues only after its architecture is explicit.
 
@@ -145,7 +145,7 @@ Goal: let model output accelerate manual annotation without making predictions a
 Work items:
 
 - Superseded: [Initial Pre-Inference design](https://github.com/daikichiba9511/goat-cv/pull/46)
-- [Issue #47: Correct the Pre-Label Import responsibility boundary](https://github.com/daikichiba9511/goat-cv/issues/47)
+- Completed: [Correct the Pre-Label Import responsibility boundary](https://github.com/daikichiba9511/goat-cv/pull/51)
 - [Issue #48: Import and persist project-level Pre-Label JSON](https://github.com/daikichiba9511/goat-cv/issues/48)
 - [Issue #49: Save PreLabel decisions with the Image Graph](https://github.com/daikichiba9511/goat-cv/issues/49)
 - [Issue #50: Add the Annotator PreLabel workflow](https://github.com/daikichiba9511/goat-cv/issues/50)
