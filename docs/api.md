@@ -139,7 +139,8 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
 | `GET` | `/projects/:projectId/images` | 画像一覧 | 1 |
 | `GET` | `/images/:imageId` | 画像メタ情報 | 1 |
 | `GET` | `/images/:imageId/file` | 画像ファイル配信 | 1 |
-| `PATCH` | `/images/:imageId` | 画像メタ更新 (status等) | 4 |
+| `PATCH` | `/images/:imageId` | transformメタデータ更新 | 1 |
+| `POST` | `/images/:imageId/workflow-transitions` | workflow eventの適用 | 4 |
 | `DELETE` | `/images/:imageId` | 画像削除 | 1 |
 
 ```jsonc
@@ -158,11 +159,12 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
   "flip_h": false,
   "flip_v": false,
   "status": "pending",
+  "escalated": false,
   "project_id": "0194...",
   "uploaded_at": "2026-03-23T12:00:00Z"
 }
 
-// GET /projects/:projectId/images?status=pending
+// GET /projects/:projectId/images?status=pending&escalated=false
 // Response 200
 {
   "items": [
@@ -172,10 +174,48 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
       "width": 2480,
       "height": 3508,
       "status": "pending",
+      "escalated": false,
       "project_id": "0194...",
       "uploaded_at": "2026-03-23T12:00:00Z"
     }
   ]
+}
+```
+
+`status`と`escalated`を同時に指定したImage一覧は、両方の条件を満たすImageだけを返す。
+`PATCH /images/:imageId`は`rotation`、`flip_h`、`flip_v`だけを受け付け、workflow状態を直接上書きしない。
+
+#### Workflow Transitions
+
+Workflow状態は任意の値で更新せず、[Image Workflow Status Specification](workflow-status.md#状態機械)に定義したeventを適用する。
+
+```jsonc
+// POST /images/:imageId/workflow-transitions
+// Request
+{
+  "event": "review_started"
+}
+
+// Response 200
+{
+  "id": "0194...",
+  "status": "in_review",
+  "escalated": false
+}
+```
+
+未知のeventは`400 Bad Request`、対象Imageが存在しない場合は`404 Not Found`を返す。
+既知のeventでも現在状態から許可されない場合は、Imageを変更せず`409 Conflict`を返す。
+
+```jsonc
+// Response 409
+{
+  "error": "workflow transition not allowed",
+  "current": {
+    "status": "approved",
+    "escalated": false
+  },
+  "allowed_events": ["approval_reopened"]
 }
 ```
 

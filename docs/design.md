@@ -101,6 +101,7 @@ Project 1 ---* Image 1 ---* Annotation
                   ├─ flip_h |
                   ├─ flip_v |
                   ├─ status |
+                  ├─ escalated: bool |
                   └─ ...    |
                             ├──* Edge
                             |     |
@@ -123,23 +124,9 @@ Project 1 ---* Image 1 ---* Annotation
 
 ### Image Status (Workflow)
 
-```
- ┌──────────┐    annotator     ┌───────────┐    reviewer     ┌──────────┐
- │  pending  │ ──────────────→ │ annotated │ ──────────────→ │ in_review│
- └──────────┘    completes     └───────────┘    picks up     └──────────┘
-                                     ↑                            │
-                                     │ rejected (差戻し)           │
-                                     └────────────────────────────┤
-                                                                  │ approved
-                                                             ┌────▼─────┐
-                                                             │ approved │
-                                                             └──────────┘
-
- Any status ──→ escalated (判断に迷った場合、上位者に相談)
-               ↑              │
-               │              │ resolved (回答後、元のstatusに戻る)
-               └──────────────┘
-```
+Image workflowは、作業段階を表すlifecycle statusと、判断待ちを表すescalation状態を直交領域として保持する。
+状態、event、guard、許可操作の正本は[Image Workflow Status Specification](workflow-status.md#状態機械)とし、この文書には遷移図を複製しない。
+`rejected`を永続状態にすることで差戻し対象を抽出でき、escalationを分離することで解除時の復帰先を別途保存せずに済む。
 
 ### Concepts
 
@@ -148,6 +135,7 @@ Project 1 ---* Image 1 ---* Annotation
 - **LabelDefinition** — プロジェクト単位で定義するラベル体系。categoryでタスク種別を区別
 - **Guideline** — プロジェクト単位のアノテーションマニュアル。Markdown形式、複数ページ構成
 - **Comment** — Image全体または特定Annotationに対する質問、問題、補足。Annotationが削除された後もQAの経緯として保持する
+- **Image workflow** — lifecycle statusとescalation状態からなる直交状態。許可event以外の遷移を拒否する
 
 Image単位でAnnotation(ノード) + Edge(辺) の有向グラフを構成する。
 
@@ -326,7 +314,7 @@ stateDiagram-v2
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Header: Project名 / Image (3/120) / Status: annotated             │
+│  Header: Project名 / Image (3/120) / Status: annotated / Escalation│
 ├──────────┬──────────────────────────────────────┬───────────────────┤
 │          │                                      │                   │
 │ Sidebar  │         Canvas (Konva)               │  Right Panel      │
@@ -351,8 +339,8 @@ stateDiagram-v2
 - **アノテーション作業中にマニュアル参照**: Right PanelのGuidelineタブで即座に確認。Canvas作業を中断しない
 - **QAフィードバック確認**: Right PanelのCommentsタブ。選択中Annotationへの指摘だけに絞り込み可能
 - **QA Comment作成**: Commentsタブから`question`、`issue`、`note`をImage全体または特定Annotationへ記録
-- **ステータスフィルタ**: Sidebarで`pending` / `rejected`等でフィルタし、作業対象を素早く特定
-- **レビュー画面**: 同じAnnotator画面を使い、reviewer権限でapprove/rejectボタンを表示
+- **ステータスフィルタ**: Sidebarで`pending` / `rejected`等のlifecycleとescalation状態を絞り込み、作業対象を素早く特定
+- **レビュー操作**: 同じAnnotator画面を使い、現在状態で許可されたreview eventを表示
 
 Guideline panelはProjectに属するページを`display_order`、`title`、Guideline IDの順で表示する。
 閲覧、追加、編集、削除はRight Panel内で完結し、tab切替やpanel開閉でCanvasを再mountしない。
