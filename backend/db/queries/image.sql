@@ -22,8 +22,8 @@ UPDATE images SET
 WHERE id = ?
 RETURNING *;
 
--- name: UpdateImageStatus :one
-UPDATE images SET status = ? WHERE id = ?
+-- name: UpdateImageWorkflow :one
+UPDATE images SET status = ?, escalated = ? WHERE id = ?
 RETURNING *;
 
 -- name: DeleteImage :exec

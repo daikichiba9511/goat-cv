@@ -91,6 +91,7 @@ func toImage(row sqlcgen.Image) domain.Image {
 		FlipH:          row.FlipH,
 		FlipV:          row.FlipV,
 		Status:         domain.ImageStatus(row.Status),
+		Escalated:      row.Escalated,
 		UploadedAt:     parseTime(row.UploadedAt),
 	}
 }

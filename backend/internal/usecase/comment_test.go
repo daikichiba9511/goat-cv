@@ -193,6 +193,7 @@ func newCommentFixture(t testing.TB) commentFixture {
 		"../../db/migrations/001_init.sql",
 		"../../db/migrations/002_guidelines.sql",
 		"../../db/migrations/003_comments.sql",
+		"../../db/migrations/004_image_workflow.sql",
 	} {
 		migration, err := os.ReadFile(migrationPath)
 		if err != nil {

@@ -16,8 +16,6 @@ const (
 	ImageStatusApproved ImageStatus = "approved"
 	// ImageStatusRejected indicates an image returned for correction.
 	ImageStatusRejected ImageStatus = "rejected"
-	// ImageStatusEscalated indicates an image needing external judgment.
-	ImageStatusEscalated ImageStatus = "escalated"
 )
 
 // Rotation represents a right-angle image rotation in degrees.
@@ -47,6 +45,7 @@ type Image struct {
 	FlipH          bool
 	FlipV          bool
 	Status         ImageStatus
+	Escalated      bool
 	UploadedAt     time.Time
 }
 
