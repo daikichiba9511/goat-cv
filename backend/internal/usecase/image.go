@@ -19,6 +19,7 @@ type imageRepository interface {
 	Get(ctx context.Context, id string) (domain.Image, error)
 	ListByProject(ctx context.Context, projectID string) ([]domain.Image, error)
 	UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool, width, height int) (domain.Image, error)
+	UpdateWorkflow(ctx context.Context, id string, status domain.ImageStatus, escalated bool) (domain.Image, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -69,6 +70,7 @@ func (u *ImageUsecase) Upload(ctx context.Context, projectID, filename string, f
 		FlipH:          false,
 		FlipV:          false,
 		Status:         domain.ImageStatusPending,
+		Escalated:      false,
 	}
 	return u.repo.Create(ctx, img)
 }

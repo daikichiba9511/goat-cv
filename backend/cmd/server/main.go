@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -141,22 +142,61 @@ func main() {
 }
 
 func runMigrations(db *sql.DB) error {
-	migrationDir := findMigrationDir()
+	return runMigrationsFromDir(db, findMigrationDir())
+}
+
+func runMigrationsFromDir(db *sql.DB, migrationDir string) error {
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			name TEXT PRIMARY KEY,
+			applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+		)
+	`); err != nil {
+		return fmt.Errorf("create migration history: %w", err)
+	}
+
 	entries, err := os.ReadDir(migrationDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("read migration directory: %w", err)
 	}
 
 	for _, entry := range entries {
 		if filepath.Ext(entry.Name()) != ".sql" {
 			continue
 		}
+		var alreadyApplied bool
+		if err := db.QueryRow(
+			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = ?)`,
+			entry.Name(),
+		).Scan(&alreadyApplied); err != nil {
+			return fmt.Errorf("check migration %s: %w", entry.Name(), err)
+		}
+		if alreadyApplied {
+			continue
+		}
+
 		data, err := os.ReadFile(filepath.Join(migrationDir, entry.Name()))
 		if err != nil {
-			return err
+			return fmt.Errorf("read migration %s: %w", entry.Name(), err)
 		}
-		if _, err := db.Exec(string(data)); err != nil {
-			return err
+
+		transaction, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin migration %s: %w", entry.Name(), err)
+		}
+		if _, err := transaction.Exec(string(data)); err != nil {
+			transaction.Rollback()
+			return fmt.Errorf("apply migration %s: %w", entry.Name(), err)
+		}
+		if _, err := transaction.Exec(
+			`INSERT INTO schema_migrations (name) VALUES (?)`,
+			entry.Name(),
+		); err != nil {
+			transaction.Rollback()
+			return fmt.Errorf("record migration %s: %w", entry.Name(), err)
+		}
+		if err := transaction.Commit(); err != nil {
+			return fmt.Errorf("commit migration %s: %w", entry.Name(), err)
 		}
 		log.Printf("applied migration: %s", entry.Name())
 	}

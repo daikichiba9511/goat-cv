@@ -91,11 +91,12 @@ func (r *ImageRepository) UpdateTransform(ctx context.Context, id string, rotati
 	return toImage(row), nil
 }
 
-// UpdateStatus changes an image workflow status.
-func (r *ImageRepository) UpdateStatus(ctx context.Context, id string, status domain.ImageStatus) (domain.Image, error) {
-	row, err := r.queries.UpdateImageStatus(ctx, sqlcgen.UpdateImageStatusParams{
-		Status: string(status),
-		ID:     id,
+// UpdateWorkflow changes both Image workflow dimensions in one statement.
+func (r *ImageRepository) UpdateWorkflow(ctx context.Context, id string, status domain.ImageStatus, escalated bool) (domain.Image, error) {
+	row, err := r.queries.UpdateImageWorkflow(ctx, sqlcgen.UpdateImageWorkflowParams{
+		Status:    string(status),
+		Escalated: escalated,
+		ID:        id,
 	})
 	if err != nil {
 		return domain.Image{}, err

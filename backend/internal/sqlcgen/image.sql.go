@@ -12,7 +12,7 @@ import (
 const createImage = `-- name: CreateImage :one
 INSERT INTO images (id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at
+RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated
 `
 
 type CreateImageParams struct {
@@ -55,6 +55,7 @@ func (q *Queries) CreateImage(ctx context.Context, arg CreateImageParams) (Image
 		&i.FlipV,
 		&i.Status,
 		&i.UploadedAt,
+		&i.Escalated,
 	)
 	return i, err
 }
@@ -69,7 +70,7 @@ func (q *Queries) DeleteImage(ctx context.Context, id string) error {
 }
 
 const getImage = `-- name: GetImage :one
-SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at FROM images WHERE id = ?
+SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated FROM images WHERE id = ?
 `
 
 func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
@@ -88,12 +89,13 @@ func (q *Queries) GetImage(ctx context.Context, id string) (Image, error) {
 		&i.FlipV,
 		&i.Status,
 		&i.UploadedAt,
+		&i.Escalated,
 	)
 	return i, err
 }
 
 const listImagesByProject = `-- name: ListImagesByProject :many
-SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at FROM images WHERE project_id = ? ORDER BY uploaded_at DESC
+SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated FROM images WHERE project_id = ? ORDER BY uploaded_at DESC
 `
 
 func (q *Queries) ListImagesByProject(ctx context.Context, projectID string) ([]Image, error) {
@@ -118,6 +120,7 @@ func (q *Queries) ListImagesByProject(ctx context.Context, projectID string) ([]
 			&i.FlipV,
 			&i.Status,
 			&i.UploadedAt,
+			&i.Escalated,
 		); err != nil {
 			return nil, err
 		}
@@ -133,7 +136,7 @@ func (q *Queries) ListImagesByProject(ctx context.Context, projectID string) ([]
 }
 
 const listImagesByProjectAndStatus = `-- name: ListImagesByProjectAndStatus :many
-SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at FROM images WHERE project_id = ? AND status = ? ORDER BY uploaded_at DESC
+SELECT id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated FROM images WHERE project_id = ? AND status = ? ORDER BY uploaded_at DESC
 `
 
 type ListImagesByProjectAndStatusParams struct {
@@ -163,6 +166,7 @@ func (q *Queries) ListImagesByProjectAndStatus(ctx context.Context, arg ListImag
 			&i.FlipV,
 			&i.Status,
 			&i.UploadedAt,
+			&i.Escalated,
 		); err != nil {
 			return nil, err
 		}
@@ -177,36 +181,6 @@ func (q *Queries) ListImagesByProjectAndStatus(ctx context.Context, arg ListImag
 	return items, nil
 }
 
-const updateImageStatus = `-- name: UpdateImageStatus :one
-UPDATE images SET status = ? WHERE id = ?
-RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at
-`
-
-type UpdateImageStatusParams struct {
-	Status string
-	ID     string
-}
-
-func (q *Queries) UpdateImageStatus(ctx context.Context, arg UpdateImageStatusParams) (Image, error) {
-	row := q.db.QueryRowContext(ctx, updateImageStatus, arg.Status, arg.ID)
-	var i Image
-	err := row.Scan(
-		&i.ID,
-		&i.ProjectID,
-		&i.Filename,
-		&i.OriginalWidth,
-		&i.OriginalHeight,
-		&i.Width,
-		&i.Height,
-		&i.Rotation,
-		&i.FlipH,
-		&i.FlipV,
-		&i.Status,
-		&i.UploadedAt,
-	)
-	return i, err
-}
-
 const updateImageTransform = `-- name: UpdateImageTransform :one
 UPDATE images SET
     rotation = ?,
@@ -215,7 +189,7 @@ UPDATE images SET
     width = ?,
     height = ?
 WHERE id = ?
-RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at
+RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated
 `
 
 type UpdateImageTransformParams struct {
@@ -250,6 +224,39 @@ func (q *Queries) UpdateImageTransform(ctx context.Context, arg UpdateImageTrans
 		&i.FlipV,
 		&i.Status,
 		&i.UploadedAt,
+		&i.Escalated,
+	)
+	return i, err
+}
+
+const updateImageWorkflow = `-- name: UpdateImageWorkflow :one
+UPDATE images SET status = ?, escalated = ? WHERE id = ?
+RETURNING id, project_id, filename, original_width, original_height, width, height, rotation, flip_h, flip_v, status, uploaded_at, escalated
+`
+
+type UpdateImageWorkflowParams struct {
+	Status    string
+	Escalated bool
+	ID        string
+}
+
+func (q *Queries) UpdateImageWorkflow(ctx context.Context, arg UpdateImageWorkflowParams) (Image, error) {
+	row := q.db.QueryRowContext(ctx, updateImageWorkflow, arg.Status, arg.Escalated, arg.ID)
+	var i Image
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Filename,
+		&i.OriginalWidth,
+		&i.OriginalHeight,
+		&i.Width,
+		&i.Height,
+		&i.Rotation,
+		&i.FlipH,
+		&i.FlipV,
+		&i.Status,
+		&i.UploadedAt,
+		&i.Escalated,
 	)
 	return i, err
 }

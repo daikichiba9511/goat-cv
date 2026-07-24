@@ -59,6 +59,7 @@ type Image struct {
 	FlipV          bool
 	Status         string
 	UploadedAt     string
+	Escalated      bool
 }
 
 type LabelDefinition struct {
