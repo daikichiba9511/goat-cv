@@ -26,12 +26,12 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 6 | Add annotation inspector | [PR #26](https://github.com/daikichiba9511/goat-cv/pull/26) | Added synchronized Annotation listing, filtering, relationship counts, selection, and deletion outside the Canvas |
 | 7 | Add remaining edge relation UI | [PR #27](https://github.com/daikichiba9511/goat-cv/pull/27) | Added constraint-aware creation, display, selection, deletion, save, and reload for all three Edge relation types |
 | 8 | Add polygon annotation UI | [PR #28](https://github.com/daikichiba9511/goat-cv/pull/28) | Added Polygon drawing, vertex editing, Edge connections, deletion, save, and reload |
+| 9 | Add COCO and YOLO export | [PR #29](https://github.com/daikichiba9511/goat-cv/pull/29) | Added self-contained COCO and YOLO archives with transform-aware coordinates, reproducible class mappings, and explicit exclusions |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 9 | Add COCO and YOLO export | [Issue #14](https://github.com/daikichiba9511/goat-cv/issues/14) | Documented category rules and COCO/YOLO export for supported node annotations |
 | 10 | Decide workflow status transitions | [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | One state-machine specification shared by the product, design, and API documents |
 | 11 | Implement workflow status transitions | Follow-up to [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) | Image status APIs, review actions, UI, and behavior tests derived from the approved state machine |
 | 12 | Add guideline management | [Issue #16](https://github.com/daikichiba9511/goat-cv/issues/16) | Guideline storage, API, safe Markdown rendering, and viewer panel |
@@ -98,7 +98,7 @@ Goal: provide common dataset export formats for downstream ML training.
 
 Work item:
 
-- [Issue #14: Add COCO and YOLO export](https://github.com/daikichiba9511/goat-cv/issues/14)
+- Completed: COCO and YOLO export in [PR #29](https://github.com/daikichiba9511/goat-cv/pull/29)
 
 Completion criteria:
 
@@ -166,4 +166,4 @@ Completion criteria:
 
 ## Current Product Baseline
 
-The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, transform controls, GOAT JSON export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.
+The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, transform controls, GOAT JSON, COCO, and YOLO export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.
