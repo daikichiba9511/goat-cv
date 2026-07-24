@@ -30,6 +30,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 10 | Decide workflow status transitions | [PR #32](https://github.com/daikichiba9511/goat-cv/pull/32) | Defined lifecycle and escalation as orthogonal states with explicit events, guards, allowed operations, and error responses |
 | 11 | Persist workflow state transitions | [PR #37](https://github.com/daikichiba9511/goat-cv/pull/37) | Added lifecycle and escalation persistence, event-driven Usecase transitions, explicit conflicts, and fail-fast schema migration |
 | 11 | Add workflow API and mutation guards | [PR #38](https://github.com/daikichiba9511/goat-cv/pull/38) | Added the event endpoint, combined status filters, state-aware Graph and transform guards, and explicit conflict responses |
+| 11 | Add Annotator workflow controls | [PR #39](https://github.com/daikichiba9511/goat-cv/pull/39) | Added visible workflow state and actions, combined Image filters, save-before-transition ordering, and state-aware editing controls |
 | 12 | Add guideline management | [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30) | Added Project-scoped Guideline CRUD and safe Markdown viewing without losing Canvas editing state |
 | 13 | Add QA comments | [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31) | Added Image/Annotation QA Comments with selected-object filtering, resolved state, and retained audit history |
 
@@ -37,7 +38,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 11 | Complete workflow status transitions | [Issues #35](https://github.com/daikichiba9511/goat-cv/issues/35), [#36](https://github.com/daikichiba9511/goat-cv/issues/36) | Annotator controls and focused contract tests built on the workflow API |
+| 11 | Complete workflow status transitions | [Issue #36](https://github.com/daikichiba9511/goat-cv/issues/36) | Focused HTTP contract tests across routing, SQLite persistence, workflow guards, and Comment availability |
 | 14 | Design pre-inference integration | [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Provider-independent API contract and candidate lifecycle decision |
 | 15 | Add pre-inference candidates | Follow-up to [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Model API integration and accept, edit, and discard workflows derived from the approved design |
 | 16 | Decide collaboration architecture | [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Comparison and decision for the first collaboration and conflict boundary |
@@ -48,7 +49,7 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 - Completed [Issue #11](https://github.com/daikichiba9511/goat-cv/issues/11) provides the annotation validation boundary used by completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13).
 - Completed [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) provides object and label inspection before the remaining drawing tools are added.
 - Completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) provides the atomic save boundary used by completed [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12).
-- Completed [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) defines the behavior, completed [Issue #33](https://github.com/daikichiba9511/goat-cv/issues/33) persists it, and completed [Issue #34](https://github.com/daikichiba9511/goat-cv/issues/34) provides the API and mutation guards used by [#35](https://github.com/daikichiba9511/goat-cv/issues/35) and [#36](https://github.com/daikichiba9511/goat-cv/issues/36).
+- Completed [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) defines the behavior, completed [Issue #33](https://github.com/daikichiba9511/goat-cv/issues/33) persists it, and completed [Issue #34](https://github.com/daikichiba9511/goat-cv/issues/34) provides the API and mutation guards used by completed [Issue #35](https://github.com/daikichiba9511/goat-cv/issues/35) and [Issue #36](https://github.com/daikichiba9511/goat-cv/issues/36).
 - Issues [#18](https://github.com/daikichiba9511/goat-cv/issues/18) and [#19](https://github.com/daikichiba9511/goat-cv/issues/19) are decision work. Each creates smaller implementation issues only after its behavior or architecture is explicit.
 
 ## Milestones
@@ -119,7 +120,7 @@ Work items:
 - Completed: Workflow status transition decision in [PR #32](https://github.com/daikichiba9511/goat-cv/pull/32)
 - Completed: Persistence and Usecase transitions in [PR #37](https://github.com/daikichiba9511/goat-cv/pull/37)
 - Completed: Workflow API and mutation guards in [PR #38](https://github.com/daikichiba9511/goat-cv/pull/38)
-- Annotator workflow controls in [Issue #35](https://github.com/daikichiba9511/goat-cv/issues/35)
+- Completed: Annotator workflow controls in [PR #39](https://github.com/daikichiba9511/goat-cv/pull/39)
 - Focused workflow contract tests in [Issue #36](https://github.com/daikichiba9511/goat-cv/issues/36)
 - Completed: Guideline management in [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30)
 - Completed: QA Comment management in [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31)
@@ -128,6 +129,7 @@ Completion criteria:
 
 - One state machine defines the status behavior across the product, design, API, implementation, and tests
 - Image status can move only through transitions allowed by the documented workflow
+- Annotator displays current workflow state and allowed actions while disabling state-prohibited edits
 - Guideline pages can be stored and viewed inside the annotator UI
 - Comments can be attached to an Image or Annotation and marked resolved
 
@@ -173,4 +175,4 @@ Completion criteria:
 
 ## Current Product Baseline
 
-The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, Project Guideline and QA Comment management with safe Markdown viewing, transform controls, GOAT JSON, COCO, and YOLO export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.
+The `main` branch supports the single-user synchronous workflow: image upload, BBox and Polygon drawing, save/load, label assignment, Annotation Inspector, lifecycle and escalation actions with filtered Image lists and state-aware editing controls, Project Guideline and QA Comment management with safe Markdown viewing, transform controls, GOAT JSON, COCO, and YOLO export, Edge APIs, and editing of `reading_order`, `key_value`, and `table_cell` relations.
