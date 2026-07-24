@@ -387,29 +387,35 @@ Validation and transaction rules:
 |--------|------|-------------|-------|
 | `POST` | `/projects/:projectId/guidelines` | ガイドライン作成 | 4 |
 | `GET` | `/projects/:projectId/guidelines` | ガイドライン一覧 | 4 |
-| `GET` | `/guidelines/:guidelineId` | ガイドライン詳細 | 4 |
-| `PATCH` | `/guidelines/:guidelineId` | ガイドライン更新 | 4 |
-| `DELETE` | `/guidelines/:guidelineId` | ガイドライン削除 | 4 |
+| `GET` | `/projects/:projectId/guidelines/:guidelineId` | ガイドライン詳細 | 4 |
+| `PATCH` | `/projects/:projectId/guidelines/:guidelineId` | ガイドライン更新 | 4 |
+| `DELETE` | `/projects/:projectId/guidelines/:guidelineId` | ガイドライン削除 | 4 |
 
 ```jsonc
 // POST /projects/:projectId/guidelines
 // Request
 {
   "title": "BBox Annotation Rules",
-  "content": "## Rules\n\n- Include margins...",
-  "order": 1
+  "body": "## Rules\n\n- Include margins...",
+  "display_order": 1
 }
 
 // Response 201
 {
   "id": "0194...",
-  "title": "BBox Annotation Rules",
-  "content": "## Rules\n\n- Include margins...",
-  "order": 1,
   "project_id": "0194...",
+  "title": "BBox Annotation Rules",
+  "body": "## Rules\n\n- Include margins...",
+  "display_order": 1,
   "updated_at": "2026-03-23T12:00:00Z"
 }
 ```
+
+`title`は前後の空白を除いた後に1文字以上、`display_order`は0以上の整数を必須とする。
+`body`は空文字列を許可し、Markdown原文を保存する。
+一覧は`display_order`、`title`、Guideline IDの順で返し、GuidelineがないProjectでは`items: []`を返す。
+取得、更新、削除では、Guideline IDが存在しない場合と指定Projectに属さない場合のどちらも`404 Not Found`を返す。
+更新は`title`、`body`、`display_order`の全項目を必須とし、成功時に`updated_at`を更新する。
 
 ### Comments
 

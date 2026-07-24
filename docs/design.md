@@ -85,8 +85,8 @@ Project 1 ---* Guideline
    |                |
    |                ├─ id
    |                ├─ title
-   |                ├─ content (Markdown)
-   |                ├─ order (表示順)
+   |                ├─ body (Markdown)
+   |                ├─ display_order
    |                └─ updated_at
 
 Project 1 ---* Image 1 ---* Annotation
@@ -338,9 +338,9 @@ stateDiagram-v2
 │  status  │   │                         │        │  ・label list     │
 │          │   └─────────────────────────┘        │  ・assign label   │
 │          │                                      │                   │
-│          │  Toolbar: BBox / Polygon / Edge /    │ [Future tabs]     │
-│          │           Select / Pan               │  ・Guideline      │
-│          │                                      │  ・Comments       │
+│          │  Toolbar: BBox / Polygon / Edge /    │ [Tab: Guidelines] │
+│          │           Select / Pan               │  ・view / manage  │
+│          │                                      │ [Future: Comments]│
 │          │                                      │                   │
 └──────────┴──────────────────────────────────────┴───────────────────┘
 ```
@@ -352,6 +352,10 @@ stateDiagram-v2
 - **エスカレーション起票**: Commentsタブから起票。画像/特定Annotationにピン留め可能
 - **ステータスフィルタ**: Sidebarで`pending` / `rejected`等でフィルタし、作業対象を素早く特定
 - **レビュー画面**: 同じAnnotator画面を使い、reviewer権限でapprove/rejectボタンを表示
+
+Guideline panelはProjectに属するページを`display_order`、`title`、Guideline IDの順で表示する。
+閲覧、追加、編集、削除はRight Panel内で完結し、tab切替やpanel開閉でCanvasを再mountしない。
+Markdown rendererはraw HTMLを解釈せず、画像構文を画像要素へ変換しない。
 
 ## Directory Structure
 
