@@ -37,6 +37,8 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 | Edge | Annotation 間の有向関係。Reading Order、KV、Table Cell を表す |
 | Guideline | プロジェクト単位の作業マニュアル |
 | Comment | Image または Annotation に紐づく質問、問題、補足のQA記録 |
+| Inference Run | 1つのImageに対する外部モデル推論の実行と結果 |
+| Candidate | Inference Runが返したBBoxまたはPolygon候補。採用されるまでAnnotationではない |
 
 ## Functional Requirements
 
@@ -122,9 +124,15 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 
 ### Pre-Inference
 
-- 外部モデルAPIへ画像を渡し、推論候補を取得できる
-- 推論候補は確定 Annotation とは区別して表示する
-- ユーザーは候補を採用、修正、破棄できる
+- 設定済みの外部モデルAPIへ変換後画像を渡し、BBoxまたはPolygonのCandidateを取得できる
+- Candidateは確定Annotationと区別して永続化し、Canvasでも視覚的に区別する
+- Candidateはconfidence、外部Label、model version、transform fingerprintを保持する
+- 外部LabelとGOAT LabelDefinitionはProject、Provider、model単位で明示的に対応付ける
+- AnnotatorはCandidateを採用、修正、破棄でき、判断はAnnotation Graphと同時に保存する
+- 採用または修正したCandidateだけを通常のAnnotationへ変換する
+- 再実行に成功した場合は新しいRunのCandidateだけを操作対象にし、以前に採用したAnnotationは保持する
+- timeout、Providerエラー、全件不正な応答では現在のCandidateを置換しない
+- 詳細な契約と状態遷移は[Pre-Inference Integration Specification](pre-inference.md)に従う
 
 ### Collaboration
 
@@ -137,8 +145,8 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 | Category | Requirement |
 |----------|-------------|
 | Usability | Annotator は Canvas から視線を大きく外さずにラベル選択、保存、画像切替を行える |
-| Data integrity | Annotation と Edge は Image 単位の1 Transactionで保存する。検証またはDB処理に失敗した場合は両方を変更しない |
-| Portability | Phase 1-4 はローカル開発環境で起動できる |
+| Data integrity | Annotation、Edge、Candidate判断は Image 単位の1 Transactionで保存する。検証またはDB処理に失敗した場合はすべて変更しない |
+| Portability | Phase 1-5 はローカル開発環境で起動できる |
 | Performance | 1画像あたり数百 Annotation までは操作が破綻しない |
 | Extensibility | Repository、Usecase、Handler の層を分け、SQLite から PostgreSQL へ移行できる余地を残す |
 | Recoverability | 画像ファイルとSQLite DBは通常のファイルバックアップで退避できる |
@@ -164,8 +172,17 @@ GOAT は **Go CV Annotation Tool** の略称であり、画像データセット
 - Backend の `go test ./...` が成功する
 - Frontend の `npm run build` が成功する
 
+## Phase 5 Acceptance Criteria
+
+- 設定済みProviderでImage単位のInference Runを実行できる
+- Candidateを確定Annotationと区別して表示できる
+- Candidateを採用、修正、破棄し、画面再読み込み後も判断結果を復元できる
+- Label MappingのないCandidateはLabelDefinitionを選ぶまで採用できない
+- timeout、Providerエラー、部分不正、重複要求、再実行の結果が[Pre-Inference Integration Specification](pre-inference.md)と一致する
+- Candidate判断を含むGraph保存に失敗した場合はAnnotation、Edge、Candidateを変更しない
+- BackendとFrontendの振る舞いテストが成功する
+
 ## Open Questions
 
 - Phase 6 の共同編集方式は WebSocket 差分同期、CRDT、OT のどれを採用するか
 - Reviewer と Annotator の権限をいつ導入するか
-- Pre-Inference のモデルAPI形式を GOAT 固有にするか、設定で複数形式を許容するか

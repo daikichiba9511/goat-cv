@@ -34,13 +34,17 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 | 11 | Verify the workflow HTTP contract | [PR #40](https://github.com/daikichiba9511/goat-cv/pull/40) | Added production-router integration scenarios for approval, revision, escalation, errors, guards, Comments, and combined filters |
 | 12 | Add guideline management | [PR #30](https://github.com/daikichiba9511/goat-cv/pull/30) | Added Project-scoped Guideline CRUD and safe Markdown viewing without losing Canvas editing state |
 | 13 | Add QA comments | [PR #31](https://github.com/daikichiba9511/goat-cv/pull/31) | Added Image/Annotation QA Comments with selected-object filtering, resolved state, and retained audit history |
+| 14 | Design pre-inference integration | [PR #46](https://github.com/daikichiba9511/goat-cv/pull/46) | Defined the provider-neutral contract, persisted candidate lifecycle, atomic decision boundary, and implementation split |
 
 ## Planned Work
 
 | Order | Change | Tracking | Deliverable |
 |-------|--------|----------|-------------|
-| 14 | Design pre-inference integration | [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Provider-independent API contract and candidate lifecycle decision |
-| 15 | Add pre-inference candidates | Follow-up to [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) | Model API integration and accept, edit, and discard workflows derived from the approved design |
+| 15 | Persist pre-inference state | [Issue #41](https://github.com/daikichiba9511/goat-cv/issues/41) | Inference Run, Candidate, and Label Mapping persistence |
+| 15 | Add provider-neutral run API | [Issue #42](https://github.com/daikichiba9511/goat-cv/issues/42) | Transformed-image inference, idempotency, failure classification, and public API |
+| 15 | Save candidate decisions atomically | [Issue #43](https://github.com/daikichiba9511/goat-cv/issues/43) | Candidate decisions committed with the Image Graph |
+| 15 | Add Annotator candidate workflow | [Issue #44](https://github.com/daikichiba9511/goat-cv/issues/44) | Distinct candidate display and staged accept, edit, and discard actions |
+| 15 | Add generic HTTP provider | [Issue #45](https://github.com/daikichiba9511/goat-cv/issues/45) | Configured multipart adapter with bounded responses and secret isolation |
 | 16 | Decide collaboration architecture | [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Comparison and decision for the first collaboration and conflict boundary |
 | 17 | Add initial realtime sync | Follow-up to [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) | Narrow realtime synchronization implementation derived from the architecture decision |
 
@@ -50,7 +54,9 @@ The product scope is defined in [spec.md](spec.md). Architecture and API details
 - Completed [Issue #9](https://github.com/daikichiba9511/goat-cv/issues/9) provides object and label inspection before the remaining drawing tools are added.
 - Completed [Issue #13](https://github.com/daikichiba9511/goat-cv/issues/13) provides the atomic save boundary used by completed [Issue #10](https://github.com/daikichiba9511/goat-cv/issues/10) and [Issue #12](https://github.com/daikichiba9511/goat-cv/issues/12).
 - Completed [Issue #15](https://github.com/daikichiba9511/goat-cv/issues/15) defines the behavior, completed [Issue #33](https://github.com/daikichiba9511/goat-cv/issues/33) persists it, and completed [Issue #34](https://github.com/daikichiba9511/goat-cv/issues/34) provides the API and mutation guards used by completed [Issue #35](https://github.com/daikichiba9511/goat-cv/issues/35) and completed [Issue #36](https://github.com/daikichiba9511/goat-cv/issues/36).
-- Issues [#18](https://github.com/daikichiba9511/goat-cv/issues/18) and [#19](https://github.com/daikichiba9511/goat-cv/issues/19) are decision work. Each creates smaller implementation issues only after its behavior or architecture is explicit.
+- [Issue #18](https://github.com/daikichiba9511/goat-cv/issues/18) defines the Pre-Inference contract used by [Issue #41](https://github.com/daikichiba9511/goat-cv/issues/41), [Issue #42](https://github.com/daikichiba9511/goat-cv/issues/42), [Issue #43](https://github.com/daikichiba9511/goat-cv/issues/43), [Issue #44](https://github.com/daikichiba9511/goat-cv/issues/44), and [Issue #45](https://github.com/daikichiba9511/goat-cv/issues/45).
+- [Issue #41](https://github.com/daikichiba9511/goat-cv/issues/41) is the persistence base for [Issue #42](https://github.com/daikichiba9511/goat-cv/issues/42) and [Issue #43](https://github.com/daikichiba9511/goat-cv/issues/43). [Issue #44](https://github.com/daikichiba9511/goat-cv/issues/44) starts after both are merged, while [Issue #45](https://github.com/daikichiba9511/goat-cv/issues/45) starts after [Issue #42](https://github.com/daikichiba9511/goat-cv/issues/42).
+- [Issue #19](https://github.com/daikichiba9511/goat-cv/issues/19) remains decision work and creates smaller implementation issues only after its architecture is explicit.
 
 ## Milestones
 
@@ -139,8 +145,12 @@ Goal: let model output accelerate manual annotation without making predictions a
 
 Work items:
 
-- [Issue #18: Design pre-inference integration](https://github.com/daikichiba9511/goat-cv/issues/18)
-- Implementation issues created from the approved contract and candidate lifecycle
+- Completed: [Pre-Inference integration design](https://github.com/daikichiba9511/goat-cv/pull/46)
+- [Issue #41: Persist Inference Run, Candidate, and Label Mapping](https://github.com/daikichiba9511/goat-cv/issues/41)
+- [Issue #42: Add provider-neutral Inference Run API](https://github.com/daikichiba9511/goat-cv/issues/42)
+- [Issue #43: Save Candidate decisions with the Image Graph](https://github.com/daikichiba9511/goat-cv/issues/43)
+- [Issue #44: Add the Annotator Candidate workflow](https://github.com/daikichiba9511/goat-cv/issues/44)
+- [Issue #45: Add the Generic HTTP Provider Adapter](https://github.com/daikichiba9511/goat-cv/issues/45)
 
 Completion criteria:
 
