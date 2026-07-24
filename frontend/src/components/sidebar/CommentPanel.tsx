@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { type Components } from "react-markdown";
 import {
   BoxSelect,
   CircleAlert,
@@ -16,6 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import * as api from "../../api/client";
 import { useAnnotationStore } from "../../stores/annotationStore";
 import type { CommentType, QAComment } from "../../types";
+import SafeMarkdown from "../markdown/SafeMarkdown";
 
 type Props = {
   imageId: string | null;
@@ -57,7 +57,6 @@ const commentMarkdownComponents: Components = {
       {children}
     </pre>
   ),
-  img: () => null,
 };
 
 const typePresentation = {
@@ -159,6 +158,7 @@ export default function CommentPanel({ imageId }: Props) {
       // Why: Image切替後に直前のImage向け本文や処理中表示を引き継がない。
       mutationSequence.current += 1;
       previousImageId.current = imageId;
+      setComments([]);
       setBody("");
       setTarget("image");
       setScope("all");
@@ -190,10 +190,11 @@ export default function CommentPanel({ imageId }: Props) {
     && author.trim().length > 0
     && body.trim().length > 0
     && (target === "image" || canTargetSelected);
+  const busy = loading || submitting || pendingCommentId !== null;
 
   const addComment = async (event: FormEvent) => {
     event.preventDefault();
-    if (!imageId || !canSubmit || submitting) return;
+    if (!imageId || !canSubmit || busy) return;
     const sequence = ++mutationSequence.current;
     setSubmitting(true);
     setError(null);
@@ -220,7 +221,7 @@ export default function CommentPanel({ imageId }: Props) {
   };
 
   const changeResolved = async (comment: QAComment, resolved: boolean) => {
-    if (!imageId || pendingCommentId) return;
+    if (!imageId || busy) return;
     const sequence = ++mutationSequence.current;
     setPendingCommentId(comment.id);
     setError(null);
@@ -243,7 +244,7 @@ export default function CommentPanel({ imageId }: Props) {
   };
 
   const removeComment = async (comment: QAComment) => {
-    if (!imageId || pendingCommentId) return;
+    if (!imageId || busy) return;
     if (!window.confirm(`Delete comment by ${comment.author}?`)) return;
     const sequence = ++mutationSequence.current;
     setPendingCommentId(comment.id);
@@ -279,7 +280,7 @@ export default function CommentPanel({ imageId }: Props) {
           aria-label="Reload comments"
           title="Reload comments"
           onClick={() => void loadComments()}
-          disabled={loading || !imageId}
+          disabled={busy || !imageId}
           className="flex h-8 w-8 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:text-gray-300"
         >
           <RefreshCw aria-hidden="true" size={14} strokeWidth={1.75} />
@@ -378,7 +379,7 @@ export default function CommentPanel({ imageId }: Props) {
         </label>
         <button
           type="submit"
-          disabled={!canSubmit || submitting}
+          disabled={!canSubmit || busy}
           className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           <Send aria-hidden="true" size={13} strokeWidth={1.75} />
@@ -401,13 +402,16 @@ export default function CommentPanel({ imageId }: Props) {
           const annotationPosition = comment.annotation_id
             ? positionByAnnotationId.get(comment.annotation_id)
             : undefined;
-          const targetLabel = comment.target_deleted
+          const targetDeleted = comment.target_deleted || (
+            comment.annotation_id !== null
+            && loadedImageId === imageId
+            && annotationPosition === undefined
+          );
+          const targetLabel = targetDeleted
             ? "Deleted annotation"
             : comment.annotation_id
               ? annotationPosition ? `Annotation #${String(annotationPosition).padStart(3, "0")}` : "Annotation"
               : "Image";
-          const pending = pendingCommentId === comment.id;
-
           return (
             <article key={comment.id} role="listitem" className={`border-b px-3 py-3 ${comment.resolved ? "bg-gray-50" : "bg-white"}`}>
               <div className="mb-2 flex items-start gap-2">
@@ -423,25 +427,17 @@ export default function CommentPanel({ imageId }: Props) {
                   aria-label={`Delete comment by ${comment.author}`}
                   title={`Delete comment by ${comment.author}`}
                   onClick={() => void removeComment(comment)}
-                  disabled={pendingCommentId !== null}
+                  disabled={busy}
                   className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:text-gray-300"
                 >
                   <Trash2 aria-hidden="true" size={13} strokeWidth={1.75} />
                 </button>
               </div>
               <div className="[&>*:last-child]:mb-0">
-                {/* Why: QA入力由来のraw HTMLと外部画像を描画せず、script実行と追跡を防ぐ。 */}
-                <ReactMarkdown
-                  skipHtml
-                  remarkPlugins={[remarkGfm]}
-                  disallowedElements={["img"]}
-                  components={commentMarkdownComponents}
-                >
-                  {comment.body}
-                </ReactMarkdown>
+                <SafeMarkdown body={comment.body} components={commentMarkdownComponents} />
               </div>
               <div className="mt-2 flex items-center gap-2 border-t pt-2">
-                <span className={`min-w-0 flex-1 truncate text-[10px] ${comment.target_deleted ? "text-red-600" : "text-gray-400"}`}>
+                <span className={`min-w-0 flex-1 truncate text-[10px] ${targetDeleted ? "text-red-600" : "text-gray-400"}`}>
                   {targetLabel}
                 </span>
                 <label className="inline-flex flex-shrink-0 items-center gap-1 text-[10px] text-gray-600">
@@ -449,7 +445,7 @@ export default function CommentPanel({ imageId }: Props) {
                     type="checkbox"
                     aria-label={`Mark comment by ${comment.author} as resolved`}
                     checked={comment.resolved}
-                    disabled={pending || pendingCommentId !== null}
+                    disabled={busy}
                     onChange={(event) => void changeResolved(comment, event.target.checked)}
                   />
                   Resolved

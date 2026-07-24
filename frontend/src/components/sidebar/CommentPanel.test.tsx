@@ -99,6 +99,9 @@ describe("CommentPanel", () => {
       });
     });
     expect(await screen.findByText("Needs a tighter box")).toBeTruthy();
+
+    useAnnotationStore.setState({ annotations: [], selectedId: null });
+    expect(await screen.findAllByText("Deleted annotation")).toHaveLength(2);
   });
 
   it("resolves, reopens, and deletes a Comment", async () => {
