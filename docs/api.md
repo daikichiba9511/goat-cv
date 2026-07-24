@@ -226,6 +226,17 @@ Image は原画像と変換後の両方のサイズ情報を持つ。
 }
 ```
 
+#### Coordinate Validation
+
+| Annotation type または入力 | 受理条件 | API の振る舞い |
+|----------------------------|----------|----------------|
+| `bbox` | `x`、`y`、`width`、`height` が有限値であり、`width` と `height` が0より大きく、矩形全体が `0.0` から `1.0` に収まる | 受理する |
+| `polygon` | `points` が相異なる点を3個以上持ち、各点の有限値 `x`、`y` が `0.0` から `1.0` に収まる | 受理する |
+| 未対応type、Schema不一致、必須項目の欠落、未知の項目、非有限値、範囲外座標 | 該当なし | 検証理由を含む `400 Bad Request` を返す |
+| 不正なAnnotationを含む `PUT` | 該当なし | 0始まりの `annotations[index]` を含む `400 Bad Request` を返し、既存Annotation集合を変更しない |
+
+このPhaseではPolygonの自己交差を検証しない。
+
 ### Edges
 
 | Method | Path | Description | Phase |

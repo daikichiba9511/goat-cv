@@ -67,14 +67,10 @@ func (h *AnnotationHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.Type == "" || len(req.Coordinates) == 0 {
-		writeError(w, http.StatusBadRequest, "type and coordinates are required")
-		return
-	}
 
 	ann, err := h.uc.Create(r.Context(), imageID, domain.AnnotationType(req.Type), domain.Coordinates(req.Coordinates), req.LabelID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeAnnotationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, toAnnotationResponse(ann))
@@ -121,7 +117,7 @@ func (h *AnnotationHandler) bulkReplace(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.uc.BulkReplace(r.Context(), imageID, annotations)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeAnnotationError(w, err)
 		return
 	}
 	items := make([]annotationResponse, len(result))
@@ -145,11 +141,7 @@ func (h *AnnotationHandler) update(w http.ResponseWriter, r *http.Request) {
 
 	ann, err := h.uc.Update(r.Context(), annID, domain.AnnotationType(req.Type), domain.Coordinates(req.Coordinates), req.LabelID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "annotation not found")
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeAnnotationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toAnnotationResponse(ann))
@@ -162,4 +154,17 @@ func (h *AnnotationHandler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// writeAnnotationError maps annotation usecase errors to their HTTP responses.
+func writeAnnotationError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		writeError(w, http.StatusNotFound, "annotation not found")
+	case errors.Is(err, usecase.ErrInvalidAnnotationType),
+		errors.Is(err, usecase.ErrInvalidAnnotationCoordinates):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, err.Error())
+	}
 }
