@@ -13,10 +13,11 @@ import type {
   LabelDefinition,
   Tool,
 } from "../../types";
+import { categoryLabel, EDGE_RELATIONS } from "../../edgeRelations";
 import {
   type DisplayBBox,
+  directedEdgePoints,
   readableTextColor,
-  readingOrderEdgePoints,
   toDisplayBBox,
 } from "./annotationGeometry";
 
@@ -31,6 +32,7 @@ type Props = {
   imageWidth: number;
   imageHeight: number;
   scale: number;
+  compactLabels: boolean;
   onAnnotationClick: (annotationId: string) => void;
   onEdgeClick: (edgeId: string) => void;
   onCoordinatesChange: (annotationId: string, coordinates: BBoxCoordinates) => void;
@@ -48,6 +50,7 @@ function AnnotationOverlay({
   imageWidth,
   imageHeight,
   scale,
+  compactLabels,
   onAnnotationClick,
   onEdgeClick,
   onCoordinatesChange,
@@ -73,27 +76,41 @@ function AnnotationOverlay({
     }
     return boxes;
   }, [annotations, imageWidth, imageHeight, scale]);
+  const displayedEdges = useMemo(() => {
+    return edges.flatMap((edge) => {
+      const sourceBox = displayBBoxByAnnotationId.get(edge.source_annotation_id);
+      const targetBox = displayBBoxByAnnotationId.get(edge.target_annotation_id);
+      if (!sourceBox || !targetBox) return [];
+
+      const points = directedEdgePoints(sourceBox, targetBox);
+      return [{
+        edge,
+        points,
+        relation: EDGE_RELATIONS[edge.type],
+        labelX: (points[0] + points[2]) / 2,
+        labelY: (points[1] + points[3]) / 2,
+      }];
+    });
+  }, [edges, displayBBoxByAnnotationId]);
 
   return (
     <>
-      {edges.map((edge) => {
-        if (edge.type !== "reading_order") return null;
-        const sourceBox = displayBBoxByAnnotationId.get(edge.source_annotation_id);
-        const targetBox = displayBBoxByAnnotationId.get(edge.target_annotation_id);
-        if (!sourceBox || !targetBox) return null;
-
+      {displayedEdges.map(({ edge, points, relation }) => {
         const isSelected = edge.id === selectedEdgeId;
         return (
           <Arrow
             key={edge.id}
-            points={readingOrderEdgePoints(sourceBox, targetBox)}
-            stroke={isSelected ? "#2563EB" : "#7C3AED"}
-            fill={isSelected ? "#2563EB" : "#7C3AED"}
-            strokeWidth={isSelected ? 3 : 2}
+            points={points}
+            stroke={relation.color}
+            fill={relation.color}
+            strokeWidth={isSelected ? 4 : 2}
+            dash={relation.dash}
             pointerLength={8}
             pointerWidth={8}
             hitStrokeWidth={14}
-            opacity={0.9}
+            opacity={isSelected ? 1 : 0.9}
+            shadowColor={isSelected ? relation.color : undefined}
+            shadowBlur={isSelected ? 8 : 0}
             onClick={(event) => {
               event.cancelBubble = true;
               onEdgeClick(edge.id);
@@ -115,6 +132,13 @@ function AnnotationOverlay({
         const labelName = annotation.label_id
           ? label?.name ?? "Unknown label"
           : "No label";
+        const displayLabel = label
+          ? compactLabels && activeTool === "edge"
+            ? categoryLabel(label.category)
+            : `${labelName} / ${categoryLabel(label.category)}`
+          : compactLabels && activeTool === "edge"
+            ? "None"
+            : labelName;
         const isSelected = annotation.id === selectedAnnotationId;
         const isEdgeSource = annotation.id === edgeSourceId;
         const labelY = displayBox.y >= 22 ? displayBox.y - 22 : displayBox.y + 4;
@@ -169,7 +193,10 @@ function AnnotationOverlay({
                 strokeWidth={isSelected || isEdgeSource ? 1 : 0}
               />
               <Text
-                text={labelName}
+                text={displayLabel}
+                width={compactLabels ? Math.max(46, displayBox.width) : undefined}
+                ellipsis={compactLabels}
+                wrap={compactLabels ? "none" : undefined}
                 fontSize={12}
                 fontStyle="bold"
                 lineHeight={1}
@@ -178,6 +205,39 @@ function AnnotationOverlay({
               />
             </KonvaLabel>
           </Fragment>
+        );
+      })}
+
+      {displayedEdges.map(({ edge, relation, labelX, labelY }) => {
+        const isSelected = edge.id === selectedEdgeId;
+        // Why: Table内にあるCellへの線も、前面の短いrelation名から選択できるようにする。
+        return (
+          <KonvaLabel
+            key={`${edge.id}-label`}
+            x={labelX}
+            y={labelY}
+            offsetX={(relation.canvasLabel.length * 6 + 8) / 2}
+            offsetY={compactLabels ? -4 : 10}
+            opacity={isSelected ? 1 : 0.92}
+            onClick={(event) => {
+              event.cancelBubble = true;
+              onEdgeClick(edge.id);
+            }}
+          >
+            <Tag
+              fill="#FFFFFF"
+              stroke={relation.color}
+              strokeWidth={isSelected ? 2 : 1}
+              cornerRadius={3}
+            />
+            <Text
+              text={relation.canvasLabel}
+              padding={4}
+              fontSize={10}
+              fontStyle="bold"
+              fill={relation.color}
+            />
+          </KonvaLabel>
         );
       })}
     </>

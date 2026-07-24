@@ -1,5 +1,13 @@
 import { create } from "zustand";
-import type { Annotation, BBoxCoordinates, Edge } from "../types";
+import type {
+  Annotation,
+  BBoxCoordinates,
+  Edge,
+  EdgeType,
+  LabelCategory,
+  LabelDefinition,
+} from "../types";
+import { categoryLabel, EDGE_RELATIONS } from "../edgeRelations";
 import * as api from "../api/client";
 
 type AnnotationStore = {
@@ -9,6 +17,8 @@ type AnnotationStore = {
   selectedId: string | null;
   selectedEdgeId: string | null;
   edgeSourceId: string | null;
+  edgeType: EdgeType;
+  edgeDraftError: string | null;
   dirty: boolean;
   saving: boolean;
   saveError: string | null;
@@ -20,8 +30,9 @@ type AnnotationStore = {
   setLabel: (id: string, labelId: string | null) => void;
   select: (id: string | null) => void;
   selectEdge: (id: string | null) => void;
-  setEdgeSource: (id: string | null) => void;
-  addReadingOrderEdge: (imageId: string, sourceAnnotationId: string, targetAnnotationId: string) => void;
+  setEdgeType: (edgeType: EdgeType) => void;
+  connectEdge: (imageId: string, annotationId: string, labels: LabelDefinition[]) => void;
+  cancelEdgeDraft: () => void;
   remove: (id: string) => void;
   removeEdge: (id: string) => void;
   save: (imageId: string) => Promise<void>;
@@ -31,6 +42,123 @@ type AnnotationStore = {
 let nextTempId = 0;
 let nextTempEdgeId = 0;
 
+function annotationCategory(
+  annotation: Annotation,
+  labels: LabelDefinition[],
+): LabelCategory | null {
+  if (!annotation.label_id) return null;
+  return labels.find((label) => label.id === annotation.label_id)?.category ?? null;
+}
+
+function categoryError(
+  endpoint: "Source" | "Target",
+  expectedCategory: LabelCategory | undefined,
+  annotation: Annotation,
+  labels: LabelDefinition[],
+): string | null {
+  if (!expectedCategory || annotationCategory(annotation, labels) === expectedCategory) {
+    return null;
+  }
+  return `${endpoint} must use a ${categoryLabel(expectedCategory)} label.`;
+}
+
+function createsReadingOrderCycle(
+  edges: Edge[],
+  sourceAnnotationId: string,
+  targetAnnotationId: string,
+): boolean {
+  const nextByAnnotationId = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (edge.type !== "reading_order") continue;
+    const nextIds = nextByAnnotationId.get(edge.source_annotation_id) ?? [];
+    nextIds.push(edge.target_annotation_id);
+    nextByAnnotationId.set(edge.source_annotation_id, nextIds);
+  }
+
+  // Why: targetからsourceへ既存経路がある場合だけ、新しいsource→targetが閉路を完成させる。
+  const pendingAnnotationIds = [targetAnnotationId];
+  const visitedAnnotationIds = new Set<string>();
+  while (pendingAnnotationIds.length > 0) {
+    const annotationId = pendingAnnotationIds.pop();
+    if (!annotationId || visitedAnnotationIds.has(annotationId)) continue;
+    if (annotationId === sourceAnnotationId) return true;
+    visitedAnnotationIds.add(annotationId);
+    pendingAnnotationIds.push(...(nextByAnnotationId.get(annotationId) ?? []));
+  }
+  return false;
+}
+
+function edgeValidationError(
+  state: Pick<AnnotationStore, "annotations" | "edges" | "edgeType">,
+  sourceAnnotationId: string,
+  targetAnnotationId: string,
+  labels: LabelDefinition[],
+): string | null {
+  // Why: 保存時だけでなく接続操作の時点で、Backendと同じ拒否理由を利用者へ返す。
+  if (sourceAnnotationId === targetAnnotationId) {
+    return "Source and target must be different annotations.";
+  }
+
+  const sourceAnnotation = state.annotations.find(
+    (annotation) => annotation.id === sourceAnnotationId,
+  );
+  const targetAnnotation = state.annotations.find(
+    (annotation) => annotation.id === targetAnnotationId,
+  );
+  if (!sourceAnnotation || !targetAnnotation) {
+    return "The selected annotation no longer exists.";
+  }
+
+  const relation = EDGE_RELATIONS[state.edgeType];
+  const sourceCategoryError = categoryError(
+    "Source",
+    relation.sourceCategory,
+    sourceAnnotation,
+    labels,
+  );
+  if (sourceCategoryError) return sourceCategoryError;
+  const targetCategoryError = categoryError(
+    "Target",
+    relation.targetCategory,
+    targetAnnotation,
+    labels,
+  );
+  if (targetCategoryError) return targetCategoryError;
+
+  const duplicateExists = state.edges.some((edge) =>
+    edge.source_annotation_id === sourceAnnotationId &&
+    edge.target_annotation_id === targetAnnotationId &&
+    edge.type === state.edgeType,
+  );
+  if (duplicateExists) return "This relation already exists.";
+
+  if (state.edgeType === "reading_order") {
+    return createsReadingOrderCycle(state.edges, sourceAnnotationId, targetAnnotationId)
+      ? "Reading order cannot contain a cycle."
+      : null;
+  }
+
+  if (state.edgeType === "key_value") {
+    if (state.edges.some((edge) =>
+      edge.type === "key_value" && edge.source_annotation_id === sourceAnnotationId,
+    )) {
+      return "The selected Key already has a Value.";
+    }
+    if (state.edges.some((edge) =>
+      edge.type === "key_value" && edge.target_annotation_id === targetAnnotationId,
+    )) {
+      return "The selected Value is already connected to a Key.";
+    }
+  }
+
+  if (state.edgeType === "table_cell" && state.edges.some((edge) =>
+    edge.type === "table_cell" && edge.target_annotation_id === targetAnnotationId,
+  )) {
+    return "The selected Cell already belongs to a Table.";
+  }
+  return null;
+}
+
 export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   loadedImageId: null,
   annotations: [],
@@ -38,6 +166,8 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
   selectedId: null,
   selectedEdgeId: null,
   edgeSourceId: null,
+  edgeType: "reading_order",
+  edgeDraftError: null,
   dirty: false,
   saving: false,
   saveError: null,
@@ -55,6 +185,8 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       selectedId: null,
       selectedEdgeId: null,
       edgeSourceId: null,
+      edgeType: "reading_order",
+      edgeDraftError: null,
       dirty: false,
       saving: false,
       saveError: null,
@@ -64,7 +196,7 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
 
   addBBox: (imageId, coords, labelId) => {
     // Why: 保存前でも選択・編集できるように、サーバーIDとは衝突しない一時IDを付ける。
-    const ann: Annotation = {
+    const annotation: Annotation = {
       id: `temp-${++nextTempId}`,
       image_id: imageId,
       type: "bbox",
@@ -72,91 +204,148 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
       label_id: labelId,
       created_at: new Date().toISOString(),
     };
-    set((s) => ({
-      annotations: [...s.annotations, ann],
-      selectedId: ann.id,
+    set((state) => ({
+      annotations: [...state.annotations, annotation],
+      selectedId: annotation.id,
       selectedEdgeId: null,
       edgeSourceId: null,
+      edgeDraftError: null,
       dirty: true,
-      revision: s.revision + 1,
+      revision: state.revision + 1,
     }));
   },
 
   updateCoordinates: (id, coords) => {
-    set((s) => ({
-      annotations: s.annotations.map((a) =>
-        a.id === id ? { ...a, coordinates: coords } : a,
+    set((state) => ({
+      annotations: state.annotations.map((annotation) =>
+        annotation.id === id ? { ...annotation, coordinates: coords } : annotation,
       ),
       dirty: true,
-      revision: s.revision + 1,
+      revision: state.revision + 1,
     }));
   },
 
   setLabel: (id, labelId) => {
-    set((s) => ({
-      annotations: s.annotations.map((a) =>
-        a.id === id ? { ...a, label_id: labelId } : a,
+    set((state) => ({
+      annotations: state.annotations.map((annotation) =>
+        annotation.id === id ? { ...annotation, label_id: labelId } : annotation,
       ),
       dirty: true,
-      revision: s.revision + 1,
+      revision: state.revision + 1,
     }));
   },
 
   select: (id) => set({ selectedId: id, selectedEdgeId: null }),
 
-  selectEdge: (id) => set({ selectedId: null, selectedEdgeId: id, edgeSourceId: null }),
+  selectEdge: (id) => set({
+    selectedId: null,
+    selectedEdgeId: id,
+    edgeSourceId: null,
+    edgeDraftError: null,
+  }),
 
-  setEdgeSource: (id) => set({ edgeSourceId: id, selectedId: id, selectedEdgeId: null }),
+  setEdgeType: (edgeType) => {
+    set((state) => {
+      if (state.edgeType === edgeType) return state;
+      return {
+        edgeType,
+        edgeSourceId: null,
+        edgeDraftError: null,
+      };
+    });
+  },
 
-  addReadingOrderEdge: (imageId, sourceAnnotationId, targetAnnotationId) => {
-    if (sourceAnnotationId === targetAnnotationId) return;
-    set((s) => {
-      const exists = s.edges.some((edge) =>
-        edge.source_annotation_id === sourceAnnotationId &&
-        edge.target_annotation_id === targetAnnotationId &&
-        edge.type === "reading_order",
+  connectEdge: (imageId, annotationId, labels) => {
+    set((state) => {
+      const annotation = state.annotations.find((item) => item.id === annotationId);
+      if (!annotation) {
+        return { edgeDraftError: "The selected annotation no longer exists." };
+      }
+
+      if (!state.edgeSourceId) {
+        const error = categoryError(
+          "Source",
+          EDGE_RELATIONS[state.edgeType].sourceCategory,
+          annotation,
+          labels,
+        );
+        if (error) {
+          return {
+            selectedId: annotationId,
+            selectedEdgeId: null,
+            edgeDraftError: error,
+          };
+        }
+        return {
+          edgeSourceId: annotationId,
+          selectedId: annotationId,
+          selectedEdgeId: null,
+          edgeDraftError: null,
+        };
+      }
+
+      const error = edgeValidationError(
+        state,
+        state.edgeSourceId,
+        annotationId,
+        labels,
       );
-      if (exists) {
-        return { edgeSourceId: targetAnnotationId, selectedId: targetAnnotationId };
+      if (error) {
+        return {
+          selectedId: annotationId,
+          selectedEdgeId: null,
+          edgeDraftError: error,
+        };
       }
 
       const edge: Edge = {
         id: `temp-edge-${++nextTempEdgeId}`,
         image_id: imageId,
-        source_annotation_id: sourceAnnotationId,
-        target_annotation_id: targetAnnotationId,
-        type: "reading_order",
+        source_annotation_id: state.edgeSourceId,
+        target_annotation_id: annotationId,
+        type: state.edgeType,
       };
+      // Why: 連続入力の単位が異なるため、Orderは終点、Tableは始点を保持し、1:1のKVは解除する。
+      const nextSourceId = state.edgeType === "reading_order"
+        ? annotationId
+        : state.edgeType === "table_cell"
+          ? state.edgeSourceId
+          : null;
       return {
-        edges: [...s.edges, edge],
-        selectedId: targetAnnotationId,
+        edges: [...state.edges, edge],
+        selectedId: annotationId,
         selectedEdgeId: null,
-        edgeSourceId: targetAnnotationId,
+        edgeSourceId: nextSourceId,
+        edgeDraftError: null,
         dirty: true,
-        revision: s.revision + 1,
+        revision: state.revision + 1,
       };
     });
   },
 
+  cancelEdgeDraft: () => set({ edgeSourceId: null, edgeDraftError: null }),
+
   remove: (id) => {
-    set((s) => ({
-      annotations: s.annotations.filter((a) => a.id !== id),
-      edges: s.edges.filter((edge) =>
+    set((state) => ({
+      annotations: state.annotations.filter((annotation) => annotation.id !== id),
+      edges: state.edges.filter((edge) =>
         edge.source_annotation_id !== id && edge.target_annotation_id !== id,
       ),
-      selectedId: s.selectedId === id ? null : s.selectedId,
-      edgeSourceId: s.edgeSourceId === id ? null : s.edgeSourceId,
+      selectedId: state.selectedId === id ? null : state.selectedId,
+      edgeSourceId: state.edgeSourceId === id ? null : state.edgeSourceId,
+      edgeDraftError: state.edgeSourceId === id ? null : state.edgeDraftError,
       dirty: true,
-      revision: s.revision + 1,
+      revision: state.revision + 1,
     }));
   },
 
   removeEdge: (id) => {
-    set((s) => ({
-      edges: s.edges.filter((edge) => edge.id !== id),
-      selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
+    set((state) => ({
+      edges: state.edges.filter((edge) => edge.id !== id),
+      selectedEdgeId: state.selectedEdgeId === id ? null : state.selectedEdgeId,
+      edgeDraftError: null,
       dirty: true,
-      revision: s.revision + 1,
+      revision: state.revision + 1,
     }));
   },
 
@@ -252,6 +441,8 @@ export const useAnnotationStore = create<AnnotationStore>((set, get) => ({
     selectedId: null,
     selectedEdgeId: null,
     edgeSourceId: null,
+    edgeType: "reading_order",
+    edgeDraftError: null,
     dirty: false,
     saving: false,
     saveError: null,

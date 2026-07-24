@@ -38,7 +38,7 @@ export function normalizeBBox(coordinates: BBoxCoordinates): BBoxCoordinates {
   };
 }
 
-export function readingOrderEdgePoints(
+export function directedEdgePoints(
   sourceBox: DisplayBBox,
   targetBox: DisplayBBox,
 ): [number, number, number, number] {

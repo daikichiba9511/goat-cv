@@ -223,6 +223,25 @@ Polygon の自己交差判定は初期の座標検証に含めない。
 - 複数の値が1領域に収まっている場合（例: "担当者: 山田, 田中"）は Value BBox を1つにする
 - 物理的に離れた複数値は、同じ label の別 KV ペアとして扱う
 
+### Edge Editing UI
+
+Edge toolは`reading_order`、`key_value`、`table_cell`のrelation typeを選択し、source、targetの順にAnnotationを選ぶ。
+relation panelは必要なLabel category、選択中のsource、拒否理由を表示する。
+CanvasとAnnotation InspectorもLabel名とcategoryを併記し、接続前に条件を判断できるようにする。
+
+| relation type | 作成成功後に保持するsource | 理由 |
+|---------------|---------------------------|------|
+| `reading_order` | 直前のtarget | 読み順を連続して入力するため |
+| `key_value` | なし | 1:1の独立したペアごとに入力するため |
+| `table_cell` | 直前のsource Table | 1つのTableから複数Cellへ続けて接続するため |
+
+relation typeを切り替える、Edge toolを離れる、またはCancelを選ぶと作成途中のsourceを破棄する。
+条件違反、自己参照、重複、多重度違反、`reading_order`の循環はローカルGraphを変更せず、relation panelへ理由を表示する。
+Frontendの検証は入力時のフィードバックのためにBackendと同じ制約を適用するが、整合性の最終判定は原子的保存を行うBackendが担う。
+
+Canvasでは`reading_order`を紫の実線と`Order`、`key_value`を緑の実線と`KV`、`table_cell`を橙の破線と`Cell`で表示する。
+選択時もrelation固有の色と線種を維持し、線幅とshadowだけを強める。
+
 ### Atomic Image Graph Save
 
 Annotator UIはImage内のAnnotationとEdgeを1つのGraphとして送信する。

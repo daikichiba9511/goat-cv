@@ -7,12 +7,22 @@ import type { ImageMeta, Tool } from "../types";
 import AnnotationCanvas from "../components/canvas/AnnotationCanvas";
 import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
+import EdgeToolPanel from "../components/toolbar/EdgeToolPanel";
 import InspectorSidebar from "../components/sidebar/InspectorSidebar";
 
 export default function Annotator() {
   const { projectId } = useParams<{ projectId: string }>();
   const { currentProject, selectProject, labels, images } = useProjectStore();
-  const { loadAnnotations, save, dirty, saving, saveError, select, clear } = useAnnotationStore();
+  const {
+    loadAnnotations,
+    save,
+    dirty,
+    saving,
+    saveError,
+    select,
+    clear,
+    cancelEdgeDraft,
+  } = useAnnotationStore();
   const [currentImage, setCurrentImage] = useState<ImageMeta | null>(null);
   const [activeTool, setActiveTool] = useState<Tool>("select");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -41,9 +51,17 @@ export default function Annotator() {
     }
   };
 
+  const handleToolChange = (tool: Tool) => {
+    if (tool !== "edge") {
+      // Why: Edge toolを離れた後のクリックで、非表示の始点からEdgeが作られないようにする。
+      cancelEdgeDraft();
+    }
+    setActiveTool(tool);
+  };
+
   const handleSelectAnnotation = (annotationId: string) => {
     // Why: Inspector選択時はSelect toolへ戻し、Canvas上の選択枠と編集Handleを同時に表示する。
-    setActiveTool("select");
+    handleToolChange("select");
     select(annotationId);
   };
 
@@ -87,7 +105,7 @@ export default function Annotator() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Toolbar
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
           onSave={handleSave}
           dirty={dirty}
           saving={saving}
@@ -99,6 +117,8 @@ export default function Annotator() {
           onFlipH={handleFlipH}
           onFlipV={handleFlipV}
         />
+
+        {activeTool === "edge" && currentImage && <EdgeToolPanel />}
 
         <div className="flex-1 relative overflow-hidden bg-gray-200">
           {currentImage ? (

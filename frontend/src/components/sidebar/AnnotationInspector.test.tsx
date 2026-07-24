@@ -81,8 +81,8 @@ describe("AnnotationInspector", () => {
     const annotationList = screen.getByRole("list", { name: "Annotations" });
     expect(within(annotationList).getByText("Car")).toBeTruthy();
     expect(within(annotationList).getByText("No label")).toBeTruthy();
-    expect(within(annotationList).getByText("BBox")).toBeTruthy();
-    expect(within(annotationList).getByText("Polygon")).toBeTruthy();
+    expect(within(annotationList).getByText("Object / BBox")).toBeTruthy();
+    expect(within(annotationList).getByText("Unlabeled / Polygon")).toBeTruthy();
     expect(within(annotationList).getAllByText("1 connection")).toHaveLength(2);
 
     fireEvent.change(screen.getByLabelText("Filter by shape"), {
@@ -90,7 +90,7 @@ describe("AnnotationInspector", () => {
     });
 
     expect(within(annotationList).queryByText("Car")).toBeNull();
-    expect(within(annotationList).getByText("Polygon")).toBeTruthy();
+    expect(within(annotationList).getByText("Unlabeled / Polygon")).toBeTruthy();
     expect(useAnnotationStore.getState().annotations).toEqual(annotations);
   });
 
