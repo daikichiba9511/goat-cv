@@ -13,6 +13,7 @@ import Sidebar from "../components/sidebar/Sidebar";
 import Toolbar from "../components/toolbar/Toolbar";
 import EdgeToolPanel from "../components/toolbar/EdgeToolPanel";
 import PolygonToolPanel from "../components/toolbar/PolygonToolPanel";
+import WorkflowControls from "../components/toolbar/WorkflowControls";
 import InspectorSidebar from "../components/sidebar/InspectorSidebar";
 
 export default function Annotator() {
@@ -184,13 +185,21 @@ export default function Annotator() {
           image={currentImage}
           graphEditable={workflowCapabilities.graphEditable}
           transformEditable={workflowCapabilities.transformEditable}
-          workflowBusy={workflowBusy}
-          workflowError={workflowError}
-          onWorkflowAction={handleWorkflowAction}
           onRotate={handleRotate}
           onFlipH={handleFlipH}
           onFlipV={handleFlipV}
         />
+
+        {currentImage && (
+          <div className="flex min-h-9 flex-shrink-0 items-center border-b bg-white px-2 sm:px-3">
+            <WorkflowControls
+              image={currentImage}
+              busy={workflowBusy}
+              error={workflowError}
+              onAction={handleWorkflowAction}
+            />
+          </div>
+        )}
 
         {activeTool === "edge" && currentImage && workflowCapabilities.graphEditable && (
           <EdgeToolPanel />

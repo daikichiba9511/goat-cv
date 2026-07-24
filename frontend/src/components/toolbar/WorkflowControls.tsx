@@ -43,7 +43,7 @@ export default function WorkflowControls({ image, busy, error, onAction }: Props
   };
 
   return (
-    <div aria-label="Image workflow" className="flex min-w-0 flex-shrink-0 items-center gap-1.5">
+    <div aria-label="Image workflow" className="flex w-full min-w-0 items-center gap-1.5">
       <span
         aria-label={`Lifecycle status: ${STATUS_LABELS[image.status]}`}
         className={`inline-flex h-7 items-center gap-1 border px-2 text-xs font-medium ${STATUS_STYLES[image.status]}`}
@@ -105,7 +105,7 @@ export default function WorkflowControls({ image, busy, error, onAction }: Props
       </details>
 
       {error && (
-        <span role="alert" title={error} className="max-w-40 truncate text-xs text-red-600">
+        <span role="alert" title={error} className="min-w-0 flex-1 truncate text-xs text-red-600">
           {error}
         </span>
       )}

@@ -9,8 +9,7 @@ import {
   RotateCw,
   Save as SaveIcon,
 } from "lucide-react";
-import type { ImageMeta, ImageWorkflowEvent, Tool } from "../../types";
-import WorkflowControls from "./WorkflowControls";
+import type { ImageMeta, Tool } from "../../types";
 
 type Props = {
   activeTool: Tool;
@@ -23,9 +22,6 @@ type Props = {
   image: ImageMeta | null;
   graphEditable: boolean;
   transformEditable: boolean;
-  workflowBusy: boolean;
-  workflowError: string | null;
-  onWorkflowAction: (event: ImageWorkflowEvent) => void;
   onRotate: () => void;
   onFlipH: () => void;
   onFlipV: () => void;
@@ -50,9 +46,6 @@ export default function Toolbar({
   image,
   graphEditable,
   transformEditable,
-  workflowBusy,
-  workflowError,
-  onWorkflowAction,
   onRotate,
   onFlipH,
   onFlipV,
@@ -195,15 +188,6 @@ export default function Toolbar({
             </button>
           </div>
         </details>
-      )}
-
-      {image && (
-        <WorkflowControls
-          image={image}
-          busy={workflowBusy}
-          error={workflowError}
-          onAction={onWorkflowAction}
-        />
       )}
 
       {saveError && (

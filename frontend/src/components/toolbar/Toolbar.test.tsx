@@ -38,9 +38,6 @@ it("keeps viewing tools available while escalation disables Graph and transform 
         image={escalatedImage}
         graphEditable={false}
         transformEditable={false}
-        workflowBusy={false}
-        workflowError={null}
-        onWorkflowAction={vi.fn()}
         onRotate={vi.fn()}
         onFlipH={vi.fn()}
         onFlipV={vi.fn()}
