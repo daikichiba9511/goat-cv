@@ -2,9 +2,18 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
 	"github.com/google/uuid"
+)
+
+var (
+	// ErrInvalidAnnotationType indicates an unsupported annotation type.
+	ErrInvalidAnnotationType = errors.New("invalid annotation type")
+	// ErrInvalidAnnotationCoordinates indicates coordinates that do not satisfy the annotation type schema.
+	ErrInvalidAnnotationCoordinates = errors.New("invalid annotation coordinates")
 )
 
 type annotationRepository interface {
@@ -27,6 +36,10 @@ func NewAnnotationUsecase(repo annotationRepository) *AnnotationUsecase {
 
 // Create creates an annotation for an image.
 func (u *AnnotationUsecase) Create(ctx context.Context, imageID string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
+	if err := validateAnnotationCoordinates(annType, coordinates); err != nil {
+		return domain.Annotation{}, err
+	}
+
 	ann := domain.Annotation{
 		ID:          uuid.Must(uuid.NewV7()).String(),
 		ImageID:     imageID,
@@ -44,6 +57,10 @@ func (u *AnnotationUsecase) ListByImage(ctx context.Context, imageID string) ([]
 
 // Update changes an annotation.
 func (u *AnnotationUsecase) Update(ctx context.Context, id string, annType domain.AnnotationType, coordinates domain.Coordinates, labelID *string) (domain.Annotation, error) {
+	if err := validateAnnotationCoordinates(annType, coordinates); err != nil {
+		return domain.Annotation{}, err
+	}
+
 	ann := domain.Annotation{
 		ID:          id,
 		Type:        annType,
@@ -63,11 +80,16 @@ func (u *AnnotationUsecase) Delete(ctx context.Context, id string) error {
 func (u *AnnotationUsecase) BulkReplace(ctx context.Context, imageID string, annotations []domain.Annotation) ([]domain.Annotation, error) {
 	// Why: フロントエンドは未保存Annotationを一時IDで扱うため、永続化境界でだけUUID v7へ置き換える。
 	// Why not: Phase 1では操作ログ同期をしないので、個別差分ではなく画像単位の現在状態を正とする。
-	for i := range annotations {
-		if annotations[i].ID == "" {
-			annotations[i].ID = uuid.Must(uuid.NewV7()).String()
+	candidateAnnotations := make([]domain.Annotation, len(annotations))
+	for i, annotation := range annotations {
+		if err := validateAnnotationCoordinates(annotation.Type, annotation.Coordinates); err != nil {
+			return nil, fmt.Errorf("annotations[%d]: %w", i, err)
 		}
-		annotations[i].ImageID = imageID
+		if annotation.ID == "" {
+			annotation.ID = uuid.Must(uuid.NewV7()).String()
+		}
+		annotation.ImageID = imageID
+		candidateAnnotations[i] = annotation
 	}
-	return u.repo.BulkReplace(ctx, imageID, annotations)
+	return u.repo.BulkReplace(ctx, imageID, candidateAnnotations)
 }
