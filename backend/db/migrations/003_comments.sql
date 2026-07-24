@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
     image_id TEXT NOT NULL REFERENCES images(id) ON DELETE CASCADE,
-    -- Why: Annotation Graphの全置換保存で同じIDが一時的に消えるため、QA記録を失わない論理参照にする。
+    -- Why: Annotation削除後も対象IDとQA記録を残し、Image向けCommentと区別できる論理参照にする。
     annotation_id TEXT,
     author TEXT NOT NULL CHECK (length(trim(author)) > 0),
     body TEXT NOT NULL CHECK (length(trim(body)) > 0),

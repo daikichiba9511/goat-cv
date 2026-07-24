@@ -349,7 +349,7 @@ stateDiagram-v2
 ### Navigation Flows
 
 - **アノテーション作業中にマニュアル参照**: Right PanelのGuidelineタブで即座に確認。Canvas作業を中断しない
-- **QAフィードバック確認**: Right PanelのCommentsタブ。特定Annotationへの指摘はクリックでCanvasにハイライト
+- **QAフィードバック確認**: Right PanelのCommentsタブ。選択中Annotationへの指摘だけに絞り込み可能
 - **QA Comment作成**: Commentsタブから`question`、`issue`、`note`をImage全体または特定Annotationへ記録
 - **ステータスフィルタ**: Sidebarで`pending` / `rejected`等でフィルタし、作業対象を素早く特定
 - **レビュー画面**: 同じAnnotator画面を使い、reviewer権限でapprove/rejectボタンを表示
@@ -365,8 +365,8 @@ Comment本文はGuidelineと同じ安全なMarkdown rendererで表示する。
 CommentはImageを所有境界とし、作成、一覧、解決状態の更新、削除をすべてImage-scoped APIで行う。
 Annotation向けCommentを作成するときは、そのAnnotationが指定Imageに属することを検証する。
 `annotation_id`には外部キーを設定しない。
-Annotation Graphの保存がAnnotationを同じIDで全置換するため、外部キーのcascadeや`SET NULL`を使うと通常の保存だけでCommentが消失またはImage向けに変質するためである。
-Annotationを実際に削除した場合もCommentを保持し、一覧レスポンスの`target_deleted`で参照先が削除済みであることを示す。
+Annotationを削除してもQAの経緯と対象IDを保持するためであり、cascadeではCommentが消失し、`SET NULL`ではImage向けCommentと区別できなくなる。
+一覧レスポンスの`target_deleted`で参照先が削除済みであることを示す。
 
 ## Directory Structure
 
