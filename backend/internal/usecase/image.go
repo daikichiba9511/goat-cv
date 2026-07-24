@@ -11,18 +11,25 @@ import (
 	"path/filepath"
 
 	"github.com/daikichiba9511/goat-cv/backend/internal/domain"
-	"github.com/daikichiba9511/goat-cv/backend/internal/repository/sqlite"
 	"github.com/google/uuid"
 )
 
+type imageRepository interface {
+	Create(ctx context.Context, image domain.Image) (domain.Image, error)
+	Get(ctx context.Context, id string) (domain.Image, error)
+	ListByProject(ctx context.Context, projectID string) ([]domain.Image, error)
+	UpdateTransform(ctx context.Context, id string, rotation domain.Rotation, flipH, flipV bool, width, height int) (domain.Image, error)
+	Delete(ctx context.Context, id string) error
+}
+
 // ImageUsecase coordinates image file storage and image metadata operations.
 type ImageUsecase struct {
-	repo        *sqlite.ImageRepository
+	repo        imageRepository
 	storagePath string
 }
 
 // NewImageUsecase creates an ImageUsecase.
-func NewImageUsecase(repo *sqlite.ImageRepository, storagePath string) *ImageUsecase {
+func NewImageUsecase(repo imageRepository, storagePath string) *ImageUsecase {
 	return &ImageUsecase{repo: repo, storagePath: storagePath}
 }
 
