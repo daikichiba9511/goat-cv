@@ -63,6 +63,16 @@ export type Annotation = {
   created_at: string;
 };
 
+export type EdgeType = "reading_order" | "key_value" | "table_cell";
+
+export type Edge = {
+  id: string;
+  image_id: string;
+  source_annotation_id: string;
+  target_annotation_id: string;
+  type: EdgeType;
+};
+
 export type ListResponse<T> = {
   items: T[];
 };
